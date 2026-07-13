@@ -222,6 +222,14 @@
             </button>
             <button type="button"
                     role="tab"
+                    aria-selected="@(_activeScenarioTab == ScenarioTab.BillEstimator)"
+                    class="@(_activeScenarioTab == ScenarioTab.BillEstimator ? "is-active" : null)"
+                    @onclick="() => SelectScenarioTab(ScenarioTab.BillEstimator)">
+                <span>Bill estimator</span>
+                <small>Compare retail electricity offers</small>
+            </button>
+            <button type="button"
+                    role="tab"
                     aria-selected="@(_activeScenarioTab == ScenarioTab.AdvancedAnalysis)"
                     class="@(_activeScenarioTab == ScenarioTab.AdvancedAnalysis ? "is-active" : null)"
                     @onclick="() => SelectScenarioTab(ScenarioTab.AdvancedAnalysis)">
@@ -375,6 +383,10 @@
                     }
                 </div>
             </div>
+        }
+        else if (_activeScenarioTab == ScenarioTab.BillEstimator)
+        {
+            <BillEstimatorPanel Profile="_profile" Offers="_billOffers" />
         }
         else
         {

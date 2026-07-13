@@ -14,6 +14,8 @@ no server, account, authentication, backup or sync.
 - Supports multiple NMIs and configurable import/export channel mapping.
 - Replays each complete historical day to show when a full battery would run out
   before the next configurable free-tariff period.
+- Compares retail electricity offers using monthly bill estimates, daily supply
+  charges, feed-in credits, free periods and up to three import rates.
 - Provides sliders for additional battery capacity and solar, with successful
   days capped at the free-power target on the chart.
 - Supports mouse-wheel chart zooming, drag-to-pan, and a full-history overview
@@ -97,6 +99,10 @@ with the single-file Windows executable.
 - Additional solar is an estimate. It uses a daylight-shaped profile totalling
   the configured average daily yield; it is not a location-specific irradiance
   forecast.
+- Bill estimates price the recorded grid imports and exports without changing
+  the existing system. Entered rate windows repeat every day, daily supply
+  charges apply to each represented date, and discounts and demand charges are
+  not included.
 - The suggested battery is the smallest tested capacity that reaches 90% of the
   battery-only savings available at the configured maximum comparison size. It
   is a diminishing-returns guide, not a quote or financial recommendation.

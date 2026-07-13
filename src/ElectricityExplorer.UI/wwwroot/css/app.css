@@ -602,7 +602,7 @@ input:focus {
 
 .scenario-tabs {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.45rem;
     margin-bottom: 1.25rem;
     padding: 0.45rem;
@@ -843,6 +843,318 @@ input:focus {
 
 .slider-control + .slider-control {
     margin-top: 1rem;
+}
+
+.bill-estimator {
+    margin-bottom: 4rem;
+}
+
+.bill-estimator-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    margin-bottom: 1.25rem;
+    padding: 0 0.35rem;
+}
+
+.bill-estimator-heading h2,
+.bill-estimator-heading p {
+    margin-bottom: 0;
+}
+
+.bill-estimator-heading > div > p:last-child {
+    margin-top: 0.35rem;
+    color: var(--ink-soft);
+}
+
+.bill-offer-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+}
+
+.bill-offer-panel {
+    display: grid;
+    grid-template-columns: minmax(420px, 0.85fr) minmax(560px, 1.15fr);
+    overflow: hidden;
+}
+
+.bill-offer-settings,
+.bill-offer-results {
+    min-width: 0;
+    padding: 1.5rem;
+}
+
+.bill-offer-results {
+    border-left: 1px solid var(--line);
+    background: #f8f7f1;
+}
+
+.bill-offer-title,
+.bill-result-heading,
+.bill-rates-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.bill-offer-title {
+    margin-bottom: 1.1rem;
+}
+
+.bill-offer-title label {
+    flex: 1;
+}
+
+.bill-offer-title input {
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--ink);
+    font-size: 1.3rem;
+    font-weight: 850;
+}
+
+.bill-offer-title input:focus {
+    box-shadow: none;
+}
+
+.bill-remove-offer,
+.bill-remove-rate {
+    color: var(--red) !important;
+    font-size: 0.74rem;
+}
+
+.bill-input-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.bill-input-grid label,
+.bill-time-pair label,
+.bill-rate-row label {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 0.3rem;
+}
+
+.bill-input-grid label > span,
+.bill-time-pair label > span,
+.bill-rate-row label > span {
+    color: var(--ink-soft);
+    font-size: 0.69rem;
+    font-weight: 750;
+}
+
+.bill-input-grid small,
+.bill-rate-row small {
+    color: var(--ink-faint);
+    font-size: 0.63rem;
+    font-weight: 600;
+}
+
+.bill-input-grid input,
+.bill-time-pair input,
+.bill-rate-row input {
+    min-height: 40px;
+    padding: 0.5rem 0.55rem;
+    font-size: 0.8rem;
+}
+
+.bill-free-period,
+.bill-rates {
+    margin: 1.15rem 0 0;
+    padding: 1rem 0 0;
+    border: 0;
+    border-top: 1px solid var(--line);
+}
+
+.bill-free-period legend,
+.bill-rates legend {
+    padding: 0;
+    font-size: 0.8rem;
+    font-weight: 850;
+}
+
+.bill-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-top: 0.7rem;
+    color: var(--ink-soft);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.bill-checkbox input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--green);
+}
+
+.bill-time-pair {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+    margin-top: 0.75rem;
+}
+
+.bill-rates-heading {
+    margin-top: 0.6rem;
+}
+
+.bill-rates-heading > span {
+    color: var(--ink-faint);
+    font-size: 0.69rem;
+}
+
+.bill-add-rate {
+    min-height: 36px;
+    padding: 0.5rem 0.8rem;
+    border: 1px solid rgba(15, 118, 110, 0.35);
+    background: var(--green-pale);
+    color: var(--green-deep);
+    font-size: 0.72rem;
+    box-shadow: 0 4px 12px rgba(15, 118, 110, 0.1);
+}
+
+.bill-add-rate:hover:not(:disabled) {
+    border-color: var(--green);
+    background: #ccebe1;
+}
+
+.bill-rate-row {
+    display: grid;
+    grid-template-columns: minmax(90px, 1fr) minmax(90px, 0.75fr) repeat(2, minmax(105px, 0.85fr)) auto;
+    align-items: end;
+    gap: 0.55rem;
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+    border-radius: 11px;
+    background: var(--canvas);
+}
+
+.bill-default-rate {
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+}
+
+.bill-default-rate > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.bill-default-rate strong {
+    font-size: 0.78rem;
+}
+
+.bill-default-rate span {
+    color: var(--ink-faint);
+    font-size: 0.66rem;
+}
+
+.bill-default-rate output {
+    color: var(--green-deep);
+    font-size: 0.8rem;
+    font-weight: 850;
+}
+
+.bill-result-heading {
+    margin-bottom: 1rem;
+}
+
+.bill-result-heading > div {
+    display: flex;
+    flex-direction: column;
+}
+
+.bill-result-heading span,
+.bill-result-heading small {
+    color: var(--ink-soft);
+    font-size: 0.69rem;
+    font-weight: 750;
+}
+
+.bill-result-heading strong {
+    color: var(--green-deep);
+    font-size: 1.55rem;
+}
+
+.bill-table-scroll {
+    max-height: 360px;
+    overflow: auto;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--panel-strong);
+}
+
+.bill-table-scroll table {
+    width: 100%;
+    min-width: 760px;
+    border-collapse: collapse;
+    font-size: 0.72rem;
+}
+
+.bill-table-scroll th,
+.bill-table-scroll td {
+    padding: 0.62rem 0.7rem;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+    text-align: left;
+}
+
+.bill-table-scroll thead th {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+    background: #eceae1;
+    color: var(--ink-soft);
+    font-size: 0.63rem;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.bill-table-scroll tbody tr:last-child th,
+.bill-table-scroll tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.bill-table-scroll .number {
+    text-align: right;
+}
+
+.bill-table-scroll .credit {
+    color: var(--green-deep);
+}
+
+.bill-table-scroll .total {
+    color: var(--ink);
+    font-weight: 850;
+}
+
+.bill-error,
+.bill-empty {
+    padding: 1rem;
+    border-radius: 10px;
+    background: var(--red-pale);
+    color: var(--red);
+    font-size: 0.75rem;
+}
+
+.bill-empty {
+    background: var(--canvas-deep);
+    color: var(--ink-soft);
+}
+
+.bill-assumptions {
+    margin: 0.85rem 0 0;
+    color: var(--ink-faint);
+    font-size: 0.67rem;
 }
 
 .validation-message,
@@ -1350,12 +1662,17 @@ input:focus {
     .channel-list {
         grid-template-columns: 1fr;
     }
+
+    .bill-offer-panel {
+        grid-template-columns: minmax(360px, 0.85fr) minmax(480px, 1.15fr);
+    }
 }
 
 @media (max-width: 900px) {
     .import-grid,
     .analysis-layout,
-    .survival-layout {
+    .survival-layout,
+    .bill-offer-panel {
         grid-template-columns: 1fr;
     }
 
@@ -1386,6 +1703,11 @@ input:focus {
     .getting-started article > span {
         margin-bottom: 1rem;
     }
+
+    .bill-offer-results {
+        border-top: 1px solid var(--line);
+        border-left: 0;
+    }
 }
 
 @media (max-width: 650px) {
@@ -1409,7 +1731,8 @@ input:focus {
     .section-heading,
     .chart-heading,
     .results-intro,
-    .detail-heading {
+    .detail-heading,
+    .bill-estimator-heading {
         align-items: flex-start;
         flex-direction: column;
     }
@@ -1463,6 +1786,27 @@ input:focus {
 
     .metric-card {
         min-height: 145px;
+    }
+
+    .bill-offer-settings,
+    .bill-offer-results {
+        padding: 1.1rem;
+    }
+
+    .bill-input-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .bill-rate-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .bill-rate-row .bill-remove-rate {
+        justify-self: start;
+    }
+
+    .bill-default-rate {
+        grid-template-columns: 1fr auto;
     }
 
     .chart-card {

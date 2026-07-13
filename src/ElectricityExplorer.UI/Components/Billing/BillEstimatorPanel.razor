@@ -1,0 +1,322 @@
+@using System.Globalization
+
+<section class="bill-estimator" role="tabpanel" aria-label="Bill estimator">
+    <div class="bill-estimator-heading">
+        <div>
+            <p class="section-kicker">Compare electricity offers</p>
+            <h2>What would each month have cost?</h2>
+            <p>Apply retail tariffs to the recorded grid import and export in this NEM12 dataset.</p>
+        </div>
+        <button type="button" class="button primary" @onclick="AddOffer">Add another offer</button>
+    </div>
+
+    <div class="bill-offer-list">
+        @foreach (var offer in Offers)
+        {
+            <article class="panel bill-offer-panel" @key="offer.Id">
+                <section class="bill-offer-settings">
+                    <div class="bill-offer-title">
+                        <label>
+                            <span class="visually-hidden">Offer name</span>
+                            <input type="text"
+                                   maxlength="80"
+                                   @bind="offer.Name"
+                                   @bind:event="oninput"
+                                   aria-label="Offer name" />
+                        </label>
+                        @if (Offers.Count > 1)
+                        {
+                            <button type="button"
+                                    class="button text-button bill-remove-offer"
+                                    @onclick="() => RemoveOffer(offer)">Remove offer</button>
+                        }
+                    </div>
+
+                    <div class="bill-input-grid">
+                        <label>
+                            <span>Daily supply charge <small>c/day</small></span>
+                            <input type="number"
+                                   min="0"
+                                   max="100000"
+                                   step="0.01"
+                                   @bind="offer.DailySupplyChargeCents"
+                                   @bind:after="() => Recalculate(offer)" />
+                        </label>
+                        <label>
+                            <span>Default import rate <small>c/kWh</small></span>
+                            <input type="number"
+                                   min="0"
+                                   max="100000"
+                                   step="0.01"
+                                   @bind="offer.DefaultImportRateCentsPerKwh"
+                                   @bind:after="() => Recalculate(offer)" />
+                        </label>
+                        <label>
+                            <span>Feed-in tariff <small>c/kWh</small></span>
+                            <input type="number"
+                                   min="0"
+                                   max="100000"
+                                   step="0.01"
+                                   @bind="offer.FeedInTariffCentsPerKwh"
+                                   @bind:after="() => Recalculate(offer)" />
+                        </label>
+                    </div>
+
+                    <fieldset class="bill-free-period">
+                        <legend>Free imports</legend>
+                        <label class="bill-checkbox">
+                            <input type="checkbox"
+                                   @bind="offer.HasFreePeriod"
+                                   @bind:after="() => Recalculate(offer)" />
+                            <span>This offer has a free period</span>
+                        </label>
+                        @if (offer.HasFreePeriod)
+                        {
+                            <div class="bill-time-pair">
+                                <label>
+                                    <span>Starts</span>
+                                    <input type="time"
+                                           step="@IntervalSeconds"
+                                           @bind="offer.FreePeriodStart"
+                                           @bind:after="() => Recalculate(offer)" />
+                                </label>
+                                <label>
+                                    <span>Ends</span>
+                                    <input type="time"
+                                           step="@IntervalSeconds"
+                                           @bind="offer.FreePeriodEnd"
+                                           @bind:after="() => Recalculate(offer)" />
+                                </label>
+                            </div>
+                        }
+                    </fieldset>
+
+                    <fieldset class="bill-rates">
+                        <legend>Import rates</legend>
+                        <div class="bill-rates-heading">
+                            <span>Default plus up to two timed rates.</span>
+                            <button type="button"
+                                    class="button bill-add-rate"
+                                    disabled="@(offer.TimedRates.Count >= MaximumTimedRates)"
+                                    @onclick="() => AddTimedRate(offer)">
+                                + Add timed rate
+                            </button>
+                        </div>
+
+                        <div class="bill-rate-row bill-default-rate">
+                            <div>
+                                <strong>Default rate</strong>
+                                <span>Applies whenever no timed or free period applies.</span>
+                            </div>
+                            <output>@offer.DefaultImportRateCentsPerKwh.ToString("N2") c/kWh</output>
+                        </div>
+
+                        @foreach (var rate in offer.TimedRates)
+                        {
+                            <div class="bill-rate-row" @key="rate.Id">
+                                <label>
+                                    <span>Name</span>
+                                    <input type="text"
+                                           maxlength="40"
+                                           @bind="rate.Name"
+                                           @bind:event="oninput" />
+                                </label>
+                                <label>
+                                    <span>Rate <small>c/kWh</small></span>
+                                    <input type="number"
+                                           min="0"
+                                           max="100000"
+                                           step="0.01"
+                                           @bind="rate.CentsPerKwh"
+                                           @bind:after="() => Recalculate(offer)" />
+                                </label>
+                                <label>
+                                    <span>Starts</span>
+                                    <input type="time"
+                                           step="@IntervalSeconds"
+                                           @bind="rate.Start"
+                                           @bind:after="() => Recalculate(offer)" />
+                                </label>
+                                <label>
+                                    <span>Ends</span>
+                                    <input type="time"
+                                           step="@IntervalSeconds"
+                                           @bind="rate.End"
+                                           @bind:after="() => Recalculate(offer)" />
+                                </label>
+                                <button type="button"
+                                        class="button text-button bill-remove-rate"
+                                        aria-label="@($"Remove {rate.Name}")"
+                                        @onclick="() => RemoveTimedRate(offer, rate)">Remove</button>
+                            </div>
+                        }
+
+                        @if (offer.TimedRates.Count == 0)
+                        {
+                            <p class="field-note">Add peak, shoulder or off-peak windows when the price changes by time of day.</p>
+                        }
+                    </fieldset>
+                </section>
+
+                <section class="bill-offer-results">
+                    <div class="bill-result-heading">
+                        <div>
+                            <span>Loaded-period total</span>
+                            <strong>@FormatCurrency(offer.Estimate?.TotalCostDollars ?? 0)</strong>
+                        </div>
+                        <small>@(offer.Estimate?.Months.Count ?? 0) month@((offer.Estimate?.Months.Count ?? 0) == 1 ? null : "s")</small>
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(offer.Error))
+                    {
+                        <div class="bill-error" role="alert">@offer.Error</div>
+                    }
+                    else if (offer.Estimate is null || offer.Estimate.Months.Count == 0)
+                    {
+                        <div class="bill-empty">There are no mapped intervals to price.</div>
+                    }
+                    else
+                    {
+                        <div class="bill-table-scroll">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th scope="col">Month</th>
+                                        <th scope="col" class="number total">Total bill</th>
+                                        <th scope="col" class="number">Days</th>
+                                        <th scope="col" class="number">Import</th>
+                                        <th scope="col" class="number">Free</th>
+                                        <th scope="col" class="number">Supply</th>
+                                        <th scope="col" class="number">Usage</th>
+                                        <th scope="col" class="number">Feed-in</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach (var month in offer.Estimate.Months)
+                                    {
+                                        <tr>
+                                            <th scope="row">@FormatMonth(month.Month)</th>
+                                            <td class="number total">@FormatCurrency(month.TotalCostDollars)</td>
+                                            <td class="number">@month.CoveredDays</td>
+                                            <td class="number">@FormatEnergy(month.ImportedKwh)</td>
+                                            <td class="number">@FormatEnergy(month.FreeImportKwh)</td>
+                                            <td class="number">@FormatCurrency(month.SupplyChargeDollars)</td>
+                                            <td class="number">@FormatCurrency(month.UsageChargeDollars)</td>
+                                            <td class="number credit">-@FormatCurrency(month.FeedInCreditDollars)</td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+
+                    <p class="bill-assumptions">
+                        Prices are assumed to include GST. Each interval is priced from its start time.
+                        Rate windows repeat every day, including weekends. Daily charges apply to each date represented
+                        in the file; discounts and demand charges are not included.
+                    </p>
+                </section>
+            </article>
+        }
+    </div>
+</section>
+
+@code {
+    private const int MaximumTimedRates = 2;
+
+    [Parameter]
+    public IReadOnlyList<SiteInterval> Profile { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public List<BillOfferSettings> Offers { get; set; } = [];
+
+    private int IntervalSeconds =>
+        Profile.Count == 0
+            ? 300
+            : Math.Max(60, (int)Math.Round(Profile[0].DurationHours * 3600d));
+
+    private IReadOnlyList<SiteInterval>? _lastProfile;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(_lastProfile, Profile)
+            && Offers.All(offer => offer.Estimate is not null || offer.Error is not null))
+        {
+            return;
+        }
+
+        _lastProfile = Profile;
+        foreach (var offer in Offers)
+        {
+            Recalculate(offer);
+        }
+    }
+
+    private void AddOffer()
+    {
+        var offerNumber = 1;
+        while (Offers.Any(offer => string.Equals(
+                   offer.Name,
+                   $"Offer {offerNumber}",
+                   StringComparison.OrdinalIgnoreCase)))
+        {
+            offerNumber++;
+        }
+
+        var offer = BillOfferSettings.Create(offerNumber);
+        Offers.Add(offer);
+        Recalculate(offer);
+    }
+
+    private void RemoveOffer(BillOfferSettings offer)
+    {
+        if (Offers.Count > 1)
+        {
+            Offers.Remove(offer);
+        }
+    }
+
+    private void AddTimedRate(BillOfferSettings offer)
+    {
+        if (offer.TimedRates.Count >= MaximumTimedRates)
+        {
+            return;
+        }
+
+        offer.TimedRates.Add(BillRateSettings.Create(offer.TimedRates.Count));
+        Recalculate(offer);
+    }
+
+    private void RemoveTimedRate(
+        BillOfferSettings offer,
+        BillRateSettings rate)
+    {
+        offer.TimedRates.Remove(rate);
+        Recalculate(offer);
+    }
+
+    private void Recalculate(BillOfferSettings offer)
+    {
+        try
+        {
+            offer.Estimate = BillEstimator.Calculate(Profile, offer.ToOptions());
+            offer.Error = null;
+        }
+        catch (ArgumentException exception)
+        {
+            offer.Estimate = null;
+            offer.Error = exception.Message;
+        }
+    }
+
+    private static string FormatCurrency(decimal value) =>
+        value < 0
+            ? $"-${Math.Abs(value):N2}"
+            : $"${value:N2}";
+
+    private static string FormatEnergy(double value) => $"{value:N1} kWh";
+
+    private static string FormatMonth(DateOnly month) =>
+        month.ToDateTime(TimeOnly.MinValue)
+            .ToString("MMM yyyy", CultureInfo.CurrentCulture);
+}

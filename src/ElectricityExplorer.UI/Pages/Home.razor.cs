@@ -17,6 +17,7 @@ public partial class Home
     private readonly Nem12Parser _parser = new();
     private readonly AnalysisSettings _settings = new();
     private readonly BatterySurvivalSettings _survivalSettings = new();
+    private readonly List<BillOfferSettings> _billOffers = [BillOfferSettings.Create(1)];
     private IReadOnlyList<DatasetSummary> _summaries = [];
     private ElectricityDataset? _dataset;
     private string? _selectedNmi;
