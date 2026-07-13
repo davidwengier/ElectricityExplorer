@@ -35,6 +35,20 @@ dotnet run --project src\ElectricityExplorer.Desktop
 The SQLite database is stored at
 `%LocalAppData%\ElectricityExplorer\electricity-explorer.db`.
 
+## Install the Windows release
+
+1. Download `ElectricityExplorer.exe` from the
+   [`latest` GitHub Release](https://github.com/davidwengier/ElectricityExplorer/releases/tag/latest).
+2. Install the
+   [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
+   for Windows x64 if the app prompts for it.
+3. Install the
+   [Microsoft Edge WebView2 Evergreen Runtime](https://go.microsoft.com/fwlink/p/?LinkId=2124703).
+4. Run `ElectricityExplorer.exe`.
+
+Windows 11 and most updated Windows 10 installations already include WebView2,
+but Windows Sandbox may require it to be installed explicitly.
+
 ## Test and build
 
 ```powershell
@@ -52,7 +66,7 @@ dotnet publish src\ElectricityExplorer.Desktop -c Release -r win-x64 --self-cont
 The output is written beneath
 `src\ElectricityExplorer.Desktop\bin\Release\net10.0-windows10.0.17763.0\win-x64\publish`.
 It contains a single `ElectricityExplorer.exe` and requires the .NET 10 Desktop
-Runtime and Microsoft Edge WebView2 Runtime.
+Runtime and Microsoft Edge WebView2 Runtime described above.
 
 Every push to `main` also runs the `Publish Windows release` GitHub Actions
 workflow. After its tests pass, the workflow updates the
