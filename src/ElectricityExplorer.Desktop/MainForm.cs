@@ -24,7 +24,7 @@ public sealed class MainForm : Form
         Size = new Size(1400, 900);
         RestoreWindowState();
 
-        var blazorWebView = new BlazorWebView
+        var blazorWebView = new EmbeddedBlazorWebView
         {
             Dock = DockStyle.Fill,
             HostPage = "wwwroot\\index.html",

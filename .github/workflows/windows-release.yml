@@ -1,4 +1,4 @@
-name: Build Windows release
+name: Publish Windows release
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: windows-release-${{ github.ref }}
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build self-contained Windows app
+    name: Build single-file Windows app
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -34,21 +34,53 @@ jobs:
       - name: Test
         run: dotnet test .\ElectricityExplorer.slnx --configuration Release --no-restore
 
-      - name: Publish self-contained Windows app
+      - name: Publish single-file Windows app
         run: >
           dotnet publish
           .\src\ElectricityExplorer.Desktop\ElectricityExplorer.Desktop.csproj
           --configuration Release
           --runtime win-x64
-          --self-contained true
+          --self-contained false
           --output .\artifacts\publish
+          -p:PublishSingleFile=true
+          -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugSymbols=false
           -p:DebugType=None
 
-      - name: Upload Windows release
-        uses: actions/upload-artifact@v7
-        with:
-          name: ElectricityExplorer-win-x64
-          path: artifacts\publish
-          if-no-files-found: error
-          retention-days: 30
+      - name: Verify single executable
+        run: |
+          $files = @(Get-ChildItem .\artifacts\publish -Recurse -File)
+          if ($files.Count -ne 1 -or $files[0].Name -ne "ElectricityExplorer.exe") {
+              throw "Expected one ElectricityExplorer.exe, found $($files.Count) files."
+          }
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "latest"
+          $asset = Resolve-Path .\artifacts\publish\ElectricityExplorer.exe
+          $notes = @'
+          Automated build of the latest successful commit on `main`.
+
+          Requires the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Runtime.
+          '@
+
+          git tag --force $tag $env:GITHUB_SHA
+          git push origin "refs/tags/$tag" --force
+
+          if (gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null) {
+              gh release edit $tag `
+                  --repo $env:GITHUB_REPOSITORY `
+                  --title "Electricity Explorer - Latest" `
+                  --notes $notes
+              gh release upload $tag $asset `
+                  --repo $env:GITHUB_REPOSITORY `
+                  --clobber
+          }
+          else {
+              gh release create $tag $asset `
+                  --repo $env:GITHUB_REPOSITORY `
+                  --title "Electricity Explorer - Latest" `
+                  --notes $notes
+          }

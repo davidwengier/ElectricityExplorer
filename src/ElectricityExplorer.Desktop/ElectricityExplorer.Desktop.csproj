@@ -7,7 +7,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView"
+                      Version="10.0.0"
+                      GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -21,12 +25,23 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationIcon>Assets\ElectricityExplorer.ico</ApplicationIcon>
+    <GenerateEmbeddedFilesManifest>true</GenerateEmbeddedFilesManifest>
   </PropertyGroup>
 
   <ItemGroup>
     <EmbeddedResource Include="Assets\ElectricityExplorer.ico">
       <LogicalName>ElectricityExplorer.Desktop.Assets.ElectricityExplorer.ico</LogicalName>
     </EmbeddedResource>
+    <EmbeddedResource Include="wwwroot\index.html"
+                      Link="wwwroot\index.html" />
+    <EmbeddedResource Include="..\ElectricityExplorer.UI\wwwroot\css\app.css"
+                      Link="wwwroot\_content\ElectricityExplorer.UI\css\app.css" />
+    <EmbeddedResource Include="..\ElectricityExplorer.UI\wwwroot\js\chartNavigator.js"
+                      Link="wwwroot\_content\ElectricityExplorer.UI\js\chartNavigator.js" />
+    <EmbeddedResource Include="$(PkgMicrosoft_AspNetCore_Components_WebView)\staticwebassets\blazor.modules.json"
+                      Link="wwwroot\_framework\blazor.modules.json" />
+    <EmbeddedResource Include="$(PkgMicrosoft_AspNetCore_Components_WebView)\staticwebassets\blazor.webview.js"
+                      Link="wwwroot\_framework\blazor.webview.js" />
     <Content Update="wwwroot\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -38,6 +53,17 @@
                                    Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
       <Reference Remove="@(_UnusedWebView2WpfReference)" />
     </ItemGroup>
+  </Target>
+
+  <Target Name="RemoveExternalWebAssetsFromSingleFilePublish"
+          AfterTargets="Publish"
+          Condition="'$(PublishSingleFile)' == 'true'">
+    <ItemGroup>
+      <_SingleFilePublishExtras Include="$(PublishDir)**\*"
+                                Exclude="$(PublishDir)$(AssemblyName).exe" />
+    </ItemGroup>
+    <Delete Files="@(_SingleFilePublishExtras)" />
+    <RemoveDir Directories="$(PublishDir)wwwroot;$(PublishDir)runtimes" />
   </Target>
 
 </Project>

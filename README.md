@@ -45,15 +45,19 @@ dotnet build ElectricityExplorer.slnx
 ## Publish the desktop app
 
 ```powershell
-dotnet publish src\ElectricityExplorer.Desktop -c Release -r win-x64 --self-contained true
+dotnet publish src\ElectricityExplorer.Desktop -c Release -r win-x64 --self-contained false `
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
 ```
 
 The output is written beneath
 `src\ElectricityExplorer.Desktop\bin\Release\net10.0-windows10.0.17763.0\win-x64\publish`.
+It contains a single `ElectricityExplorer.exe` and requires the .NET 10 Desktop
+Runtime and Microsoft Edge WebView2 Runtime.
 
-Every push to `main` also runs the `Build Windows release` GitHub Actions
-workflow. After its tests pass, the workflow publishes the self-contained
-`ElectricityExplorer-win-x64` download from the run's **Artifacts** section.
+Every push to `main` also runs the `Publish Windows release` GitHub Actions
+workflow. After its tests pass, the workflow updates the
+[`latest` GitHub Release](https://github.com/davidwengier/ElectricityExplorer/releases/tag/latest)
+with the single-file Windows executable.
 
 ## Project structure
 
