@@ -66,7 +66,10 @@ jobs:
           Requires the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Runtime.
           '@
 
-          if (gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null) {
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          $releaseExists = $LASTEXITCODE -eq 0
+
+          if ($releaseExists) {
               gh release edit $tag `
                   --repo $env:GITHUB_REPOSITORY `
                   --title "Electricity Explorer - Latest" `
