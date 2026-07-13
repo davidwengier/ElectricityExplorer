@@ -1,0 +1,305 @@
+@using System.Globalization
+
+<section class="chart-card survival-chart-card" aria-label="Battery survival by day">
+    <div class="chart-heading">
+        <div>
+            <h3>When the battery runs out</h3>
+            <p>
+                Each point starts with a full battery. Green points at the top made it to the
+                next free-tariff period; purple points show when it ran out.
+            </p>
+        </div>
+        <div class="chart-legend" aria-label="Chart legend">
+            <span><i style="--series-colour: #6d4ed1"></i>Battery ran out</span>
+            <span><i style="--series-colour: #0f766e"></i>Made it to free power</span>
+        </div>
+    </div>
+
+    @if (Result is null || Result.Days.Count == 0)
+    {
+        <div class="chart-empty">There are no complete days available for this scenario.</div>
+    }
+    else
+    {
+        <div class="chart-scroll">
+            <svg id="@_mainChartId"
+                 class="line-chart survival-chart chart-interactive"
+                 viewBox="0 0 1000 360"
+                 role="img"
+                 aria-label="@ChartDescription"
+                 preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <clipPath id="@_clipPathId">
+                        <rect x="@PlotLeft"
+                              y="@PlotTop"
+                              width="@(PlotRight - PlotLeft)"
+                              height="@(PlotBottom - PlotTop)" />
+                    </clipPath>
+                </defs>
+
+                <rect class="survival-target-band"
+                      x="@PlotLeft"
+                      y="@PlotTop"
+                      width="@(PlotRight - PlotLeft)"
+                      height="18" />
+
+                @foreach (var tick in _runtimeTicks)
+                {
+                    <line class="chart-grid"
+                          x1="@PlotLeft"
+                          x2="@PlotRight"
+                          y1="@Y(tick)"
+                          y2="@Y(tick)" />
+                    <svg:text class="chart-axis-label"
+                              x="@(PlotLeft - 14)"
+                              y="@(Y(tick) + 5)"
+                              text-anchor="end">@FormatRuntimeTick(tick)</svg:text>
+                }
+
+                @foreach (var tick in _dateTicks)
+                {
+                    <line class="chart-grid chart-grid-vertical"
+                          x1="@X(tick)"
+                          x2="@X(tick)"
+                          y1="@PlotTop"
+                          y2="@PlotBottom" />
+                    <svg:text class="chart-axis-label"
+                              x="@X(tick)"
+                              y="@(PlotBottom + 28)"
+                              text-anchor="middle">@FormatDateTick(tick)</svg:text>
+                }
+
+                <line class="chart-axis"
+                      x1="@PlotLeft"
+                      x2="@PlotRight"
+                      y1="@PlotBottom"
+                      y2="@PlotBottom" />
+
+                <g clip-path="@($"url(#{_clipPathId})")">
+                    <path class="chart-line survival-runtime-line"
+                          d="@RuntimePath" />
+
+                    @foreach (var day in _visibleDays)
+                    {
+                        <circle class="survival-point @(day.ReachedTarget ? "reached-target" : null)"
+                                cx="@X(day.BatteryFullAt)"
+                                cy="@Y(day.RuntimeHours)"
+                                r="@(day.ReachedTarget ? 3.2 : 2.4)" />
+                        <circle class="survival-hit-target"
+                                cx="@X(day.BatteryFullAt)"
+                                cy="@Y(day.RuntimeHours)"
+                                r="8">
+                            <title>@Tooltip(day)</title>
+                        </circle>
+                    }
+                </g>
+            </svg>
+        </div>
+
+        <ChartMouseNavigator MainChartId="@_mainChartId"
+                             Series="@OverviewSeries"
+                             FullViewport="_fullViewport"
+                             ViewViewport="_viewViewport"
+                             MinimumRange="_minimumZoomRange"
+                             ViewViewportChanged="ViewportChanged" />
+    }
+</section>
+
+@code {
+    private const double PlotLeft = 92;
+    private const double PlotRight = 975;
+    private const double PlotTop = 28;
+    private const double PlotBottom = 305;
+
+    [Parameter]
+    public BatterySurvivalResult? Result { get; set; }
+
+    [Parameter]
+    public TimeOnly BatteryFullAt { get; set; }
+
+    private readonly string _mainChartId = $"survival-chart-{Guid.NewGuid():N}";
+    private readonly string _clipPathId = $"survival-chart-clip-{Guid.NewGuid():N}";
+    private IReadOnlyList<BatterySurvivalDay> _visibleDays = [];
+    private IReadOnlyList<DateTime> _dateTicks = [];
+    private IReadOnlyList<double> _runtimeTicks = [];
+    private ChartViewport _fullViewport;
+    private ChartViewport _viewViewport;
+    private double _minimumZoomRange;
+    private DateTime _minimumDate;
+    private DateTime _maximumDate;
+    private bool _hasViewport;
+
+    private IReadOnlyList<ChartSeries> OverviewSeries =>
+        Result is null
+            ? []
+            :
+            [
+                new ChartSeries(
+                    "Battery runtime",
+                    "#6d4ed1",
+                    Result.Days
+                        .Select(day => new ChartPoint(
+                            day.BatteryFullAt.Ticks,
+                            day.RuntimeHours,
+                            string.Empty))
+                        .ToArray())
+            ];
+
+    private string RuntimePath =>
+        _visibleDays.Count == 0
+            ? string.Empty
+            : string.Join(
+                " ",
+                _visibleDays.Select((day, index) =>
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"{(index == 0 ? "M" : "L")} {X(day.BatteryFullAt):0.##} {Y(day.RuntimeHours):0.##}")));
+
+    private string ChartDescription =>
+        Result is null
+            ? "No battery survival data."
+            : $"Battery reached the next free period on {Result.ReachedTargetPercent:0.#} percent of {Result.Days.Count:N0} modelled days.";
+
+    protected override void OnParametersSet()
+    {
+        if (Result is null || Result.Days.Count == 0)
+        {
+            _visibleDays = [];
+            _dateTicks = [];
+            _runtimeTicks = [];
+            _hasViewport = false;
+            return;
+        }
+
+        var minimum = Result.Days[0].BatteryFullAt.Ticks;
+        var maximum = Result.Days[^1].BatteryFullAt.Ticks;
+        if (minimum == maximum)
+        {
+            maximum = Result.Days[0].BatteryFullAt.AddDays(1).Ticks;
+        }
+
+        var fullViewport = new ChartViewport(minimum, maximum);
+        if (!_hasViewport || !ChartViewportMath.AreEqual(_fullViewport, fullViewport))
+        {
+            _viewViewport = fullViewport;
+        }
+        else
+        {
+            _viewViewport = ChartViewportMath.Clamp(_viewViewport, fullViewport);
+        }
+
+        _fullViewport = fullViewport;
+        _hasViewport = true;
+        _minimumZoomRange = ChartViewportMath.CalculateMinimumRange(
+            Result.Days.Select(day => (double)day.BatteryFullAt.Ticks),
+            fullViewport.Range);
+        RebuildViewport();
+    }
+
+    private void ViewportChanged(ChartViewport viewport)
+    {
+        var clamped = ChartViewportMath.Clamp(viewport, _fullViewport);
+        _viewViewport = Result is null
+            ? clamped
+            : ChartViewportMath.SnapToValues(
+                clamped,
+                Result.Days.Select(day => (double)day.BatteryFullAt.Ticks));
+        RebuildViewport();
+    }
+
+    private void RebuildViewport()
+    {
+        if (Result is null)
+        {
+            return;
+        }
+
+        _minimumDate = new DateTime((long)_viewViewport.Minimum);
+        _maximumDate = new DateTime((long)_viewViewport.Maximum);
+        _visibleDays = Result.Days
+            .Where(day =>
+                day.BatteryFullAt.Ticks >= _viewViewport.Minimum
+                && day.BatteryFullAt.Ticks <= _viewViewport.Maximum)
+            .ToArray();
+        _dateTicks = CreateDateTicks(_minimumDate, _maximumDate, 5);
+        _runtimeTicks = Enumerable.Range(0, 5)
+            .Select(index => Result.TargetRuntimeHours * index / 4d)
+            .ToArray();
+    }
+
+    private double X(DateTime value) =>
+        PlotLeft
+        + (value - _minimumDate).TotalHours
+        / (_maximumDate - _minimumDate).TotalHours
+        * (PlotRight - PlotLeft);
+
+    private double Y(double runtimeHours)
+    {
+        if (Result is null || Result.TargetRuntimeHours <= 0)
+        {
+            return PlotBottom;
+        }
+
+        var boundedRuntime = Math.Clamp(runtimeHours, 0, Result.TargetRuntimeHours);
+        return PlotBottom
+            - boundedRuntime / Result.TargetRuntimeHours
+            * (PlotBottom - PlotTop);
+    }
+
+    private string FormatRuntimeTick(double runtimeHours)
+    {
+        var timestamp = new DateTime(2000, 1, 1)
+            + BatteryFullAt.ToTimeSpan()
+            + TimeSpan.FromHours(runtimeHours);
+        var label = timestamp.ToString("h:mm tt", CultureInfo.CurrentCulture);
+
+        return Result is not null
+               && Math.Abs(runtimeHours - Result.TargetRuntimeHours) < 0.001
+            ? $"{label} free"
+            : label;
+    }
+
+    private static string Tooltip(BatterySurvivalDay day)
+    {
+        if (day.ReachedTarget)
+        {
+            return $"{day.BatteryFullAt:dd MMM yyyy}: reached free power at {day.TargetAt:h:mm tt}";
+        }
+
+        return $"{day.BatteryFullAt:dd MMM yyyy}: ran out at {day.DepletedAt:h:mm tt} after {FormatDuration(day.RuntimeHours)}";
+    }
+
+    private static string FormatDuration(double hours)
+    {
+        var duration = TimeSpan.FromHours(hours);
+        return duration.Minutes == 0
+            ? $"{(int)duration.TotalHours} hr"
+            : $"{(int)duration.TotalHours} hr {duration.Minutes} min";
+    }
+
+    private string FormatDateTick(DateTime value)
+    {
+        var range = _maximumDate - _minimumDate;
+        return range.TotalDays switch
+        {
+            <= 10 => value.ToString("ddd dd MMM", CultureInfo.CurrentCulture),
+            <= 120 => value.ToString("dd MMM", CultureInfo.CurrentCulture),
+            _ => value.ToString("MMM yy", CultureInfo.CurrentCulture)
+        };
+    }
+
+    private static IReadOnlyList<DateTime> CreateDateTicks(
+        DateTime minimum,
+        DateTime maximum,
+        int count)
+    {
+        var ticks = new DateTime[count];
+        var rangeTicks = maximum.Ticks - minimum.Ticks;
+        for (var index = 0; index < count; index++)
+        {
+            ticks[index] = minimum.AddTicks(rangeTicks * index / (count - 1));
+        }
+
+        return ticks;
+    }
+}

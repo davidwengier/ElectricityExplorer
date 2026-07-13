@@ -1,0 +1,305 @@
+@using System.Globalization
+
+<section class="chart-card" aria-label="@Title">
+    <div class="chart-heading">
+        <div>
+            <h3>@Title</h3>
+            @if (!string.IsNullOrWhiteSpace(Subtitle))
+            {
+                <p>@Subtitle</p>
+            }
+        </div>
+        <div class="chart-legend" aria-label="Chart legend">
+            @foreach (var series in Series)
+            {
+                <span>
+                    <i style="@($"--series-colour: {series.Color}")"></i>
+                    @series.Name
+                </span>
+            }
+        </div>
+    </div>
+
+    @if (_allPoints.Count == 0)
+    {
+        <div class="chart-empty">No data is available for this chart.</div>
+    }
+    else
+    {
+        <div class="chart-scroll">
+            <svg id="@_mainChartId"
+                 class="line-chart @(EnableZoom ? "chart-interactive" : null)"
+                 viewBox="0 0 1000 360"
+                 role="img"
+                 aria-label="@($"{Title}. {Subtitle}")"
+                 preserveAspectRatio="xMidYMid meet">
+                <defs>
+                    <clipPath id="@_clipPathId">
+                        <rect x="@PlotLeft"
+                              y="@PlotTop"
+                              width="@(PlotRight - PlotLeft)"
+                              height="@(PlotBottom - PlotTop)" />
+                    </clipPath>
+                </defs>
+
+                @foreach (var tick in _yTicks)
+                {
+                    <line class="chart-grid"
+                          x1="@PlotLeft"
+                          x2="@PlotRight"
+                          y1="@Y(tick)"
+                          y2="@Y(tick)" />
+                    <svg:text class="chart-axis-label"
+                              x="@(PlotLeft - 14)"
+                              y="@(Y(tick) + 5)"
+                              text-anchor="end">@FormatY(tick)</svg:text>
+                }
+
+                @foreach (var tick in _xTicks)
+                {
+                    <line class="chart-grid chart-grid-vertical"
+                          x1="@X(tick)"
+                          x2="@X(tick)"
+                          y1="@PlotTop"
+                          y2="@PlotBottom" />
+                    <svg:text class="chart-axis-label"
+                              x="@X(tick)"
+                              y="@(PlotBottom + 28)"
+                              text-anchor="middle">@FormatX(tick)</svg:text>
+                }
+
+                <line class="chart-axis"
+                      x1="@PlotLeft"
+                      x2="@PlotRight"
+                      y1="@PlotBottom"
+                      y2="@PlotBottom" />
+
+                <g clip-path="@($"url(#{_clipPathId})")">
+                    @foreach (var visibleSeries in _visibleSeries)
+                    {
+                        @if (visibleSeries.Points.Count > 1)
+                        {
+                            <path class="chart-line"
+                                  d="@PathFor(visibleSeries.Points)"
+                                  stroke="@visibleSeries.Series.Color"
+                                  stroke-dasharray="@visibleSeries.Series.DashArray" />
+                        }
+
+                        @if (visibleSeries.Points.Count <= 160)
+                        {
+                            @foreach (var point in visibleSeries.Points)
+                            {
+                                <circle class="chart-point"
+                                        cx="@X(point.X)"
+                                        cy="@Y(point.Y)"
+                                        r="4"
+                                        fill="@visibleSeries.Series.Color">
+                                    <title>@point.Tooltip</title>
+                                </circle>
+                            }
+                        }
+                    }
+                </g>
+            </svg>
+        </div>
+
+        @if (EnableZoom && _allPoints.Count > 1)
+        {
+            <ChartMouseNavigator MainChartId="@_mainChartId"
+                                 Series="Series"
+                                 FullViewport="_fullViewport"
+                                 ViewViewport="_viewViewport"
+                                 MinimumRange="_minimumZoomRange"
+                                 ViewViewportChanged="ViewportChanged" />
+        }
+    }
+</section>
+
+@code {
+    private const double PlotLeft = 78;
+    private const double PlotRight = 975;
+    private const double PlotTop = 20;
+    private const double PlotBottom = 305;
+
+    [Parameter, EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    [Parameter]
+    public string? Subtitle { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ChartSeries> Series { get; set; } = [];
+
+    [Parameter]
+    public ChartXAxisKind XAxisKind { get; set; } = ChartXAxisKind.Time;
+
+    [Parameter]
+    public string YUnit { get; set; } = string.Empty;
+
+    [Parameter]
+    public string YPrefix { get; set; } = string.Empty;
+
+    [Parameter]
+    public string XUnit { get; set; } = string.Empty;
+
+    [Parameter]
+    public bool StartYAxisAtZero { get; set; } = true;
+
+    [Parameter]
+    public bool EnableZoom { get; set; } = true;
+
+    private readonly string _mainChartId = $"line-chart-{Guid.NewGuid():N}";
+    private readonly string _clipPathId = $"chart-clip-{Guid.NewGuid():N}";
+    private IReadOnlyList<ChartPoint> _allPoints = [];
+    private IReadOnlyList<VisibleChartSeries> _visibleSeries = [];
+    private IReadOnlyList<double> _xTicks = [];
+    private IReadOnlyList<double> _yTicks = [];
+    private ChartViewport _fullViewport;
+    private ChartViewport _viewViewport;
+    private double _minimumZoomRange;
+    private double _minimumX;
+    private double _maximumX;
+    private double _minimumY;
+    private double _maximumY;
+    private bool _hasViewport;
+
+    protected override void OnParametersSet()
+    {
+        _allPoints = Series.SelectMany(series => series.Points).ToArray();
+        if (_allPoints.Count == 0)
+        {
+            _visibleSeries = [];
+            _xTicks = [];
+            _yTicks = [];
+            _hasViewport = false;
+            return;
+        }
+
+        var minimumX = _allPoints.Min(point => point.X);
+        var maximumX = _allPoints.Max(point => point.X);
+        if (Math.Abs(maximumX - minimumX) < double.Epsilon)
+        {
+            minimumX -= 1;
+            maximumX += 1;
+        }
+
+        var fullViewport = new ChartViewport(minimumX, maximumX);
+        if (!_hasViewport || !ChartViewportMath.AreEqual(_fullViewport, fullViewport))
+        {
+            _viewViewport = fullViewport;
+        }
+        else
+        {
+            _viewViewport = ChartViewportMath.Clamp(_viewViewport, fullViewport);
+        }
+
+        _fullViewport = fullViewport;
+        _hasViewport = true;
+        _minimumZoomRange = ChartViewportMath.CalculateMinimumRange(
+            _allPoints.Select(point => point.X),
+            fullViewport.Range);
+        RebuildViewport();
+    }
+
+    private void ViewportChanged(ChartViewport viewport)
+    {
+        var clamped = ChartViewportMath.Clamp(viewport, _fullViewport);
+        _viewViewport = ChartViewportMath.SnapToValues(
+            clamped,
+            _allPoints.Select(point => point.X));
+        RebuildViewport();
+    }
+
+    private void RebuildViewport()
+    {
+        _minimumX = _viewViewport.Minimum;
+        _maximumX = _viewViewport.Maximum;
+        _visibleSeries = Series
+            .Select(series => new VisibleChartSeries(
+                series,
+                series.Points
+                    .Where(point =>
+                        point.X >= _minimumX
+                        && point.X <= _maximumX)
+                    .ToArray()))
+            .Where(series => series.Points.Count > 0)
+            .ToArray();
+
+        var visiblePoints = _visibleSeries
+            .SelectMany(series => series.Points)
+            .ToArray();
+        if (visiblePoints.Length == 0)
+        {
+            _xTicks = CreateTicks(_minimumX, _maximumX, 5);
+            _yTicks = [];
+            return;
+        }
+
+        _minimumY = StartYAxisAtZero
+            ? Math.Min(0, visiblePoints.Min(point => point.Y))
+            : visiblePoints.Min(point => point.Y);
+        _maximumY = visiblePoints.Max(point => point.Y);
+
+        if (Math.Abs(_maximumY - _minimumY) < 0.000001)
+        {
+            _maximumY = _minimumY + 1;
+        }
+
+        var yPadding = (_maximumY - _minimumY) * 0.08;
+        _maximumY += yPadding;
+        if (!StartYAxisAtZero)
+        {
+            _minimumY -= yPadding;
+        }
+
+        _xTicks = CreateTicks(_minimumX, _maximumX, 5);
+        _yTicks = CreateTicks(_minimumY, _maximumY, 5);
+    }
+
+    private double X(double value) =>
+        PlotLeft + (value - _minimumX) / (_maximumX - _minimumX) * (PlotRight - PlotLeft);
+
+    private double Y(double value) =>
+        PlotBottom - (value - _minimumY) / (_maximumY - _minimumY) * (PlotBottom - PlotTop);
+
+    private string PathFor(IReadOnlyList<ChartPoint> points) =>
+        string.Join(
+            " ",
+            points.Select((point, index) =>
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{(index == 0 ? "M" : "L")} {X(point.X):0.##} {Y(point.Y):0.##}")));
+
+    private string FormatX(double value)
+    {
+        if (XAxisKind == ChartXAxisKind.Number)
+        {
+            return $"{value:0.#}{XUnit}";
+        }
+
+        var timestamp = new DateTime((long)value);
+        var range = TimeSpan.FromTicks((long)(_maximumX - _minimumX));
+        return range.TotalDays switch
+        {
+            <= 2 => timestamp.ToString("ddd HH:mm", CultureInfo.CurrentCulture),
+            <= 62 => timestamp.ToString("dd MMM", CultureInfo.CurrentCulture),
+            _ => timestamp.ToString("MMM yy", CultureInfo.CurrentCulture)
+        };
+    }
+
+    private string FormatY(double value) =>
+        $"{YPrefix}{value:0.#}{YUnit}";
+
+    private static IReadOnlyList<double> CreateTicks(double minimum, double maximum, int count)
+    {
+        var ticks = new double[count];
+        var step = (maximum - minimum) / (count - 1);
+        for (var index = 0; index < count; index++)
+        {
+            ticks[index] = minimum + step * index;
+        }
+
+        return ticks;
+    }
+
+}

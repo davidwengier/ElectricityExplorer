@@ -1,0 +1,562 @@
+@page "/"
+
+<PageTitle>Electricity Explorer</PageTitle>
+
+<main class="page-shell">
+    <section class="panel import-panel">
+        <div class="section-heading">
+            <div>
+                <p class="section-kicker">1. Bring your data</p>
+                <h2>Import an NEM12 file</h2>
+                <p>CSV parsing and storage happen locally. The original file is never uploaded.</p>
+            </div>
+            <span class="storage-state @(_storageStatus.IsDurable ? "is-persistent" : null)">
+                <i></i>
+                @_storageStatus.Label
+            </span>
+        </div>
+
+        <div class="import-grid">
+            <button type="button"
+                    class="upload-zone @(_busy ? "is-disabled" : null)"
+                    @onclick="ImportPickedFileAsync"
+                    disabled="@_busy">
+                <span class="upload-mark">N12</span>
+                <strong>@(_busy ? _busyMessage : "Choose an NEM12 CSV file")</strong>
+                <span>Up to 100 MB</span>
+            </button>
+
+            <div class="saved-data">
+                <label for="dataset-select">Saved on this device</label>
+                @if (_summaries.Count == 0)
+                {
+                    <div class="saved-empty">
+                        <strong>No saved datasets yet</strong>
+                        <span>Your first import will appear here.</span>
+                    </div>
+                }
+                else
+                {
+                    <select id="dataset-select"
+                            value="@_dataset?.Id"
+                            @onchange="DatasetChangedAsync"
+                            disabled="@_busy">
+                        @foreach (var summary in _summaries)
+                        {
+                            <option value="@summary.Id">
+                                @summary.Name (@summary.ReadingCount.ToString("N0") readings)
+                            </option>
+                        }
+                    </select>
+
+                    @if (_pendingDeleteId == _dataset?.Id)
+                    {
+                        <div class="delete-confirmation">
+                            <span>This cannot be undone.</span>
+                            <button type="button"
+                                    class="button danger"
+                                    @onclick="DeleteSelectedDatasetAsync"
+                                    disabled="@_busy">Confirm delete</button>
+                            <button type="button"
+                                    class="button text-button"
+                                    @onclick="CancelDelete">Cancel</button>
+                        </div>
+                    }
+                    else
+                    {
+                        <button type="button"
+                                class="button text-button delete-link"
+                                @onclick="RequestDelete"
+                                disabled="@_busy">Delete this local dataset</button>
+                    }
+                }
+            </div>
+        </div>
+    </section>
+
+    @if (!string.IsNullOrWhiteSpace(_error))
+    {
+        <div class="alert alert-error" role="alert">
+            <strong>Something needs attention</strong>
+            <span>@_error</span>
+            <button type="button" aria-label="Dismiss error" @onclick="DismissError">Dismiss</button>
+        </div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_notice))
+    {
+        <div class="alert alert-success" role="status">
+            <strong>Ready</strong>
+            <span>@_notice</span>
+            <button type="button" aria-label="Dismiss message" @onclick="DismissNotice">Dismiss</button>
+        </div>
+    }
+
+    @if (_initializing)
+    {
+        <section class="panel loading-panel">
+            <div class="skeleton-line wide"></div>
+            <div class="skeleton-line"></div>
+            <div class="skeleton-grid">
+                <div></div>
+                <div></div>
+                <div></div>
+            </div>
+        </section>
+    }
+    else if (_dataset is null)
+    {
+        <section class="getting-started">
+            <article>
+                <span>01</span>
+                <h3>Read the meter file</h3>
+                <p>NEM12 import and export channels are detected automatically, with an override when a retailer uses unusual labels.</p>
+            </article>
+            <article>
+                <span>02</span>
+                <h3>Try a scenario</h3>
+                <p>Change battery capacity, power, reserve, efficiency, tariffs and additional solar assumptions.</p>
+            </article>
+            <article>
+                <span>03</span>
+                <h3>Compare the outcome</h3>
+                <p>Inspect grid imports, battery state of charge, depletion time, bill impact and diminishing returns by battery size.</p>
+            </article>
+        </section>
+    }
+    else
+    {
+        <section class="dataset-strip">
+            <div>
+                <span>Loaded dataset</span>
+                <strong>@_dataset.Name</strong>
+                <small>@_dataset.SourceFileName</small>
+            </div>
+            <div class="dataset-stat">
+                <span>Readings</span>
+                <strong>@_dataset.Readings.Count.ToString("N0")</strong>
+            </div>
+            <div class="dataset-stat">
+                <span>Channels</span>
+                <strong>@_dataset.Channels.Count</strong>
+            </div>
+            <div class="dataset-stat">
+                <span>Imported</span>
+                <strong>@_dataset.ImportedAt.ToLocalTime().ToString("dd MMM yyyy")</strong>
+            </div>
+            @if (_dataset.Nmis.Count > 1)
+            {
+                <label class="nmi-picker">
+                    <span>Analyse NMI</span>
+                    <select value="@_selectedNmi" @onchange="NmiChangedAsync" disabled="@_busy">
+                        @foreach (var nmi in _dataset.Nmis)
+                        {
+                            <option value="@nmi">@nmi</option>
+                        }
+                    </select>
+                </label>
+            }
+            else
+            {
+                <div class="dataset-stat">
+                    <span>NMI</span>
+                    <strong>@_selectedNmi</strong>
+                </div>
+            }
+        </section>
+
+        <section class="panel channel-panel">
+            <div class="section-heading compact">
+                <div>
+                    <p class="section-kicker">2. Check the channels</p>
+                    <h2>Import or export?</h2>
+                    <p>Common E channels are mapped to grid import and B channels to export. Correct anything unusual before analysis.</p>
+                </div>
+                <span class="channel-count">@SelectedChannels.Count channel@(SelectedChannels.Count == 1 ? null : "s")</span>
+            </div>
+
+            <div class="channel-list">
+                @foreach (var channel in SelectedChannels)
+                {
+                    <article class="channel-row">
+                        <div class="channel-code">@channel.NmiSuffix</div>
+                        <div class="channel-details">
+                            <strong>@(channel.DataStreamIdentifier ?? channel.RegisterId ?? "Meter channel")</strong>
+                            <span>@channel.Unit every @channel.IntervalMinutes min</span>
+                        </div>
+                        <label>
+                            <span class="visually-hidden">Direction for channel @channel.NmiSuffix</span>
+                            <select value="@channel.Direction"
+                                    @onchange="args => SetChannelDirection(channel, args)">
+                                <option value="@EnergyFlowDirection.Import">Grid import</option>
+                                <option value="@EnergyFlowDirection.Export">Grid export</option>
+                                <option value="@EnergyFlowDirection.Ignore">Ignore</option>
+                            </select>
+                        </label>
+                    </article>
+                }
+            </div>
+
+            @if (_dataset.Warnings.Count > 0)
+            {
+                <details class="import-warnings">
+                    <summary>@_dataset.Warnings.Count import note@(_dataset.Warnings.Count == 1 ? null : "s")</summary>
+                    <ul>
+                        @foreach (var warning in _dataset.Warnings)
+                        {
+                            <li>@warning</li>
+                        }
+                    </ul>
+                </details>
+            }
+        </section>
+
+        <nav class="scenario-tabs" role="tablist" aria-label="Energy scenarios">
+            <button type="button"
+                    role="tab"
+                    aria-selected="@(_activeScenarioTab == ScenarioTab.BatterySurvival)"
+                    class="@(_activeScenarioTab == ScenarioTab.BatterySurvival ? "is-active" : null)"
+                    @onclick="() => SelectScenarioTab(ScenarioTab.BatterySurvival)">
+                <span>Battery survival</span>
+                <small>Will it last until free power?</small>
+            </button>
+            <button type="button"
+                    role="tab"
+                    aria-selected="@(_activeScenarioTab == ScenarioTab.AdvancedAnalysis)"
+                    class="@(_activeScenarioTab == ScenarioTab.AdvancedAnalysis ? "is-active" : null)"
+                    @onclick="() => SelectScenarioTab(ScenarioTab.AdvancedAnalysis)">
+                <span>Detailed analysis</span>
+                <small>The existing savings and sizing model</small>
+            </button>
+        </nav>
+
+        @if (_activeScenarioTab == ScenarioTab.BatterySurvival)
+        {
+            <div class="survival-layout" role="tabpanel" aria-label="Battery survival scenario">
+                <aside class="panel survival-controls-panel">
+                    <div class="section-heading compact">
+                        <div>
+                            <p class="section-kicker">Set one scenario</p>
+                            <h2>Will the battery last?</h2>
+                            <p>Replay the recorded data with an added battery and extra solar.</p>
+                        </div>
+                    </div>
+
+                    <fieldset>
+                        <legend>Free tariff period</legend>
+                        <div class="free-period-heading">
+                            <strong>@FreeTariffPeriodText</strong>
+                            <span>Imports are treated as free in this window.</span>
+                        </div>
+                        <div class="range-stack">
+                            <label>
+                                <span>Starts <output>@FormatTime(_survivalSettings.FreeTariffStart)</output></span>
+                                <input type="range"
+                                       min="0"
+                                       max="23.5"
+                                       step="0.5"
+                                       value="@_survivalSettings.FreeTariffStartHour"
+                                       @onchange="FreeTariffStartChanged" />
+                            </label>
+                            <label>
+                                <span>Ends <output>@FormatTime(_survivalSettings.FreeTariffEnd)</output></span>
+                                <input type="range"
+                                       min="0"
+                                       max="23.5"
+                                       step="0.5"
+                                       value="@_survivalSettings.FreeTariffEndHour"
+                                       @onchange="FreeTariffEndChanged" />
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Start with a full battery</legend>
+                        <label class="time-field">
+                            <span>Assume it is full at</span>
+                            <input type="time"
+                                   step="@ProfileIntervalSeconds"
+                                   @bind="BatteryFullTimeValue"
+                                   @bind:event="oninput" />
+                        </label>
+                        <p class="field-note">Time snaps to the @ProfileIntervalMinutes-minute meter interval.</p>
+                        <div class="survival-goal">
+                            <span>Goal</span>
+                            <strong>Reach @SurvivalGoalText</strong>
+                            <small>@SurvivalDurationText from full battery to free power.</small>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Add to the recorded system</legend>
+                        <div class="slider-control">
+                            <div>
+                                <span>Added battery</span>
+                                <output>+@_survivalSettings.AdditionalBatteryCapacityKwh.ToString("0.#") kWh</output>
+                            </div>
+                            <input type="range"
+                                   min="0"
+                                   max="@BatterySurvivalSettings.MaximumAdditionalBatteryKwh"
+                                   step="0.5"
+                                   value="@_survivalSettings.AdditionalBatteryCapacityKwh"
+                                   @onchange="AdditionalBatteryChanged" />
+                        </div>
+                        <div class="slider-control">
+                            <div>
+                                <span>Added solar</span>
+                                <output>+@_survivalSettings.AdditionalSolarKw.ToString("0.#") kW</output>
+                            </div>
+                            <input type="range"
+                                   min="0"
+                                   max="@BatterySurvivalSettings.MaximumAdditionalSolarKw"
+                                   step="0.5"
+                                   value="@_survivalSettings.AdditionalSolarKw"
+                                   @onchange="AdditionalSolarChanged" />
+                        </div>
+                    </fieldset>
+
+                </aside>
+
+                <div class="results-column">
+                    @if (_batterySurvival is null || _batterySurvival.Days.Count == 0)
+                    {
+                        <section class="panel results-empty">
+                            <span class="results-mark">~</span>
+                            <h2>No complete scenario windows</h2>
+                            <p>The loaded data needs a continuous interval history from the full-battery time to the next free period.</p>
+                        </section>
+                    }
+                    else
+                    {
+                        <section class="results-intro survival-results-intro">
+                            <div>
+                                <p class="section-kicker">Scenario result</p>
+                                <h2>Can it reach @SurvivalGoalText?</h2>
+                            </div>
+                            <span>@_batterySurvival.Days.Count.ToString("N0") complete days replayed</span>
+                        </section>
+
+                        <section class="metrics-grid survival-metrics">
+                            <article class="metric-card feature">
+                                <span>Days that make it</span>
+                                <strong>@_batterySurvival.ReachedTargetPercent.ToString("0.#")%</strong>
+                                <p>
+                                    @_batterySurvival.ReachedTargetDays.ToString("N0") of
+                                    @_batterySurvival.Days.Count.ToString("N0") days reached free power.
+                                </p>
+                            </article>
+                            <article class="metric-card">
+                                <span>Typical outcome</span>
+                                <strong class="metric-text">@SurvivalTypicalOutcomeText</strong>
+                                <p>The middle result after every complete day is ordered from shortest to longest.</p>
+                            </article>
+                            <article class="metric-card">
+                                <span>Worst day</span>
+                                <strong class="metric-text">@SurvivalWorstOutcomeText</strong>
+                                <p>@SurvivalWorstDayText</p>
+                            </article>
+                        </section>
+
+                        <BatterySurvivalChart Result="@_batterySurvival"
+                                              BatteryFullAt="@_survivalSettings.BatteryFullAt" />
+
+                        <section class="panel scenario-assumptions">
+                            <h3>Modelling assumptions</h3>
+                            <p>
+                                Recorded grid import and export are the baseline, including the effect of any
+                                existing solar or battery. The added battery value is nominal capacity;
+                                @BatterySurvivalOptions.BatteryUtilizationPercent.ToString("0")% is treated as usable
+                                (@_survivalSettings.UsableBatteryCapacityKwh.ToString("0.#") kWh for this scenario).
+                                No inverter power limit or conversion losses are applied.
+                                Extra solar uses a daylight-shaped estimate of
+                                @_survivalSettings.SolarYieldKwhPerKwDay.ToString("0.#") kWh per kW per day.
+                            </p>
+                        </section>
+                    }
+                </div>
+            </div>
+        }
+        else
+        {
+        <div class="analysis-layout" role="tabpanel" aria-label="Detailed battery and solar analysis">
+            <aside class="panel controls-panel">
+                <div class="section-heading compact">
+                    <div>
+                        <p class="section-kicker">3. Shape a scenario</p>
+                        <h2>System assumptions</h2>
+                    </div>
+                </div>
+
+                <EditForm Model="_settings" OnValidSubmit="RunAnalysisAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <fieldset>
+                        <legend>Battery</legend>
+                        <div class="field-grid">
+                            <label>
+                                <span>Capacity <small>kWh</small></span>
+                                <InputNumber @bind-Value="_settings.BatteryCapacityKwh" min="0" max="200" step="0.5" />
+                            </label>
+                            <label>
+                                <span>Charge / discharge <small>kW</small></span>
+                                <InputNumber @bind-Value="_settings.BatteryPowerKw" min="0" max="100" step="0.5" />
+                            </label>
+                            <label>
+                                <span>Round-trip efficiency <small>%</small></span>
+                                <InputNumber @bind-Value="_settings.RoundTripEfficiencyPercent" min="50" max="100" step="1" />
+                            </label>
+                            <label>
+                                <span>Reserve <small>%</small></span>
+                                <InputNumber @bind-Value="_settings.ReservePercent" min="0" max="50" step="1" />
+                            </label>
+                            <label class="wide-field">
+                                <span>Starting charge <small>%</small></span>
+                                <InputNumber @bind-Value="_settings.InitialChargePercent" min="0" max="100" step="1" />
+                                <ValidationMessage For="@(() => _settings.InitialChargePercent)" />
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>More solar</legend>
+                        <div class="field-grid">
+                            <label>
+                                <span>Additional array <small>kW</small></span>
+                                <InputNumber @bind-Value="_settings.AdditionalSolarKw" min="0" max="200" step="0.5" />
+                            </label>
+                            <label>
+                                <span>Average yield <small>kWh/kW/day</small></span>
+                                <InputNumber @bind-Value="_settings.SolarYieldKwhPerKwDay" min="0" max="20" step="0.1" />
+                            </label>
+                        </div>
+                        <p class="field-note">Extra solar uses a daylight-shaped estimate that totals the average daily yield you enter.</p>
+                    </fieldset>
+
+                    <fieldset>
+                        <legend>Electricity prices</legend>
+                        <div class="field-grid">
+                            <label>
+                                <span>Import tariff <small>$/kWh</small></span>
+                                <InputNumber @bind-Value="_settings.ImportTariffPerKwh" min="0" max="10" step="0.01" />
+                            </label>
+                            <label>
+                                <span>Feed-in tariff <small>$/kWh</small></span>
+                                <InputNumber @bind-Value="_settings.FeedInTariffPerKwh" min="0" max="10" step="0.01" />
+                            </label>
+                            <label class="wide-field">
+                                <span>Compare batteries up to <small>kWh</small></span>
+                                <InputNumber @bind-Value="_settings.MaximumComparedBatteryKwh" min="1" max="100" step="1" />
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <button type="submit" class="button primary run-button" disabled="@_busy">
+                        @(_busy ? "Calculating..." : "Run local analysis")
+                    </button>
+                    <p class="local-action-note">This also saves the channel mapping in local storage.</p>
+                </EditForm>
+            </aside>
+
+            <div class="results-column">
+                @if (_simulation is null || _sizing is null)
+                {
+                    <section class="panel results-empty">
+                        <span class="results-mark">~</span>
+                        <h2>Ready for an analysis</h2>
+                        <p>Map at least one channel, check the assumptions, then run the calculation.</p>
+                    </section>
+                }
+                else
+                {
+                    <section class="results-intro">
+                        <div>
+                            <p class="section-kicker">Scenario result</p>
+                            <h2>@ResultPeriodLabel</h2>
+                        </div>
+                        <span>@_profile.Count.ToString("N0") intervals modelled</span>
+                    </section>
+
+                    <section class="metrics-grid">
+                        <article class="metric-card feature">
+                            <span>Suggested battery</span>
+                            <strong>@RecommendedBatteryText</strong>
+                            <p>Smallest tested size reaching 90% of the battery savings available by @_settings.MaximumComparedBatteryKwh.ToString("0") kWh.</p>
+                        </article>
+                        <article class="metric-card">
+                            <span>Grid import after changes</span>
+                            <strong>@FormatEnergy(_simulation.GridImportAfterBatteryKwh)</strong>
+                            <p>@GridImportReductionText less than the original file.</p>
+                        </article>
+                        <article class="metric-card">
+                            <span>Combined bill change</span>
+                            <strong class="@(_simulation.CombinedSavings >= 0 ? "positive" : "negative")">
+                                @FormatSignedCurrency(_simulation.CombinedSavings)
+                            </strong>
+                            <p>Battery plus additional solar over the loaded period.</p>
+                        </article>
+                        <article class="metric-card">
+                            <span>Battery reaches reserve</span>
+                            <strong class="metric-text">@BatteryDepletionText</strong>
+                            <p>Based on the selected starting charge and continuous interval order.</p>
+                        </article>
+                        <article class="metric-card">
+                            <span>Additional solar generated</span>
+                            <strong>@FormatEnergy(_simulation.AdditionalSolarKwh)</strong>
+                            <p>Estimated from the configured array size and average yield.</p>
+                        </article>
+                        <article class="metric-card">
+                            <span>Equivalent battery cycles</span>
+                            <strong>@_simulation.EquivalentBatteryCycles.ToString("N1")</strong>
+                            <p>Delivered battery energy divided by nominal capacity.</p>
+                        </article>
+                    </section>
+
+                    <LineChart Title="Daily grid energy"
+                               Subtitle="Original imports compared with the selected solar and battery scenario."
+                               Series="_dailyEnergySeries"
+                               YUnit=" kWh" />
+
+                    <LineChart Title="Battery size comparison"
+                               Subtitle="Bill savings from the battery alone over the loaded data period. Sizing starts empty to avoid counting free starting energy."
+                               Series="_batterySizingSeries"
+                               XAxisKind="ChartXAxisKind.Number"
+                               EnableZoom="false"
+                               XUnit=" kWh"
+                               YPrefix="$" />
+
+                    <section class="detail-heading">
+                        <div>
+                            <p class="section-kicker">Interval detail</p>
+                            <h2>Look inside a day</h2>
+                        </div>
+                        <label>
+                            <span>Day</span>
+                            <input type="date"
+                                   min="@DetailMinimumDate"
+                                   max="@DetailMaximumDate"
+                                   value="@DetailDateValue"
+                                   @onchange="DetailDateChanged" />
+                        </label>
+                    </section>
+
+                    <LineChart Title="Energy through the day"
+                               Subtitle="Interval energy before and after the modelled battery, plus estimated additional solar."
+                               Series="_detailEnergySeries"
+                               YUnit=" kWh" />
+
+                    <LineChart Title="Battery state of charge"
+                               Subtitle="The reserve is treated as empty for household use."
+                               Series="_batterySocSeries"
+                               YUnit="%" />
+                }
+            </div>
+        </div>
+        }
+    }
+</main>
+
+<footer class="site-footer">
+    <strong>Electricity Explorer</strong>
+    <span>@_storageStatus.FooterText</span>
+</footer>

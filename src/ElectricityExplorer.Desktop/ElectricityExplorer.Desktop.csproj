@@ -1,0 +1,35 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ElectricityExplorer.Core\ElectricityExplorer.Core.csproj" />
+    <ProjectReference Include="..\ElectricityExplorer.UI\ElectricityExplorer.UI.csproj" />
+    <ProjectReference Include="..\ElectricityExplorer.Storage.Sqlite\ElectricityExplorer.Storage.Sqlite.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.10" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Content Update="wwwroot\**">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <Target Name="RemoveUnusedWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences">
+    <ItemGroup>
+      <_UnusedWebView2WpfReference Include="@(Reference)"
+                                   Condition="'%(Reference.Filename)' == 'Microsoft.Web.WebView2.Wpf'" />
+      <Reference Remove="@(_UnusedWebView2WpfReference)" />
+    </ItemGroup>
+  </Target>
+
+</Project>

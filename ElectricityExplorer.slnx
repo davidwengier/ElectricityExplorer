@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ElectricityExplorer.Core/ElectricityExplorer.Core.csproj" />
+    <Project Path="src/ElectricityExplorer.Desktop/ElectricityExplorer.Desktop.csproj" />
+    <Project Path="src/ElectricityExplorer.Storage.Sqlite/ElectricityExplorer.Storage.Sqlite.csproj" />
+    <Project Path="src/ElectricityExplorer.UI/ElectricityExplorer.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ElectricityExplorer.Core.Tests/ElectricityExplorer.Core.Tests.csproj" />
+    <Project Path="tests/ElectricityExplorer.Storage.Sqlite.Tests/ElectricityExplorer.Storage.Sqlite.Tests.csproj" />
+  </Folder>
+</Solution>

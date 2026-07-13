@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Electricity Explorer</title>
+    <base href="/" />
+    <link rel="stylesheet" href="_content/ElectricityExplorer.UI/css/app.css" />
+</head>
+<body>
+    <div id="app">
+        <svg class="loading-progress">
+            <circle r="40%" cx="50%" cy="50%"></circle>
+            <circle r="40%" cx="50%" cy="50%"></circle>
+        </svg>
+        <div class="loading-progress-text"></div>
+    </div>
+
+    <div id="blazor-error-ui">
+        Electricity Explorer hit an unexpected error.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">x</span>
+    </div>
+
+    <script src="_framework/blazor.webview.js"></script>
+</body>
+</html>
