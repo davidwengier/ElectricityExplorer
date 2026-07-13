@@ -12,13 +12,21 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>ElectricityExplorer</AssemblyName>
+    <AssemblyTitle>Electricity Explorer</AssemblyTitle>
+    <Product>Electricity Explorer</Product>
+    <Description>Explore NEM12 electricity usage and model battery and solar scenarios.</Description>
     <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationIcon>Assets\ElectricityExplorer.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Assets\ElectricityExplorer.ico">
+      <LogicalName>ElectricityExplorer.Desktop.Assets.ElectricityExplorer.ico</LogicalName>
+    </EmbeddedResource>
     <Content Update="wwwroot\**">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

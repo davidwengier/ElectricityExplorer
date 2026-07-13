@@ -1,0 +1,54 @@
+name: Build Windows release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build self-contained Windows app
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore .\ElectricityExplorer.slnx
+
+      - name: Test
+        run: dotnet test .\ElectricityExplorer.slnx --configuration Release --no-restore
+
+      - name: Publish self-contained Windows app
+        run: >
+          dotnet publish
+          .\src\ElectricityExplorer.Desktop\ElectricityExplorer.Desktop.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          --output .\artifacts\publish
+          -p:DebugSymbols=false
+          -p:DebugType=None
+
+      - name: Upload Windows release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ElectricityExplorer-win-x64
+          path: artifacts\publish
+          if-no-files-found: error
+          retention-days: 30

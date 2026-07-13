@@ -5,6 +5,9 @@ namespace ElectricityExplorer.Desktop;
 
 public sealed class MainForm : Form
 {
+    private const string ApplicationIconResourceName =
+        "ElectricityExplorer.Desktop.Assets.ElectricityExplorer.ico";
+
     private readonly WindowStateStore _windowStateStore;
     private FormWindowState _lastNonMinimizedState = FormWindowState.Normal;
 
@@ -15,6 +18,7 @@ public sealed class MainForm : Form
         _windowStateStore = windowStateStore;
 
         Text = "Electricity Explorer";
+        Icon = LoadApplicationIcon();
         StartPosition = FormStartPosition.CenterScreen;
         MinimumSize = new Size(1100, 720);
         Size = new Size(1400, 900);
@@ -29,6 +33,16 @@ public sealed class MainForm : Form
         blazorWebView.RootComponents.Add<App>("#app");
 
         Controls.Add(blazorWebView);
+    }
+
+    private static Icon LoadApplicationIcon()
+    {
+        using var stream = typeof(MainForm).Assembly.GetManifestResourceStream(
+            ApplicationIconResourceName)
+            ?? throw new InvalidOperationException(
+                $"Embedded application icon '{ApplicationIconResourceName}' was not found.");
+        using var icon = new Icon(stream);
+        return (Icon)icon.Clone();
     }
 
     protected override void OnResize(EventArgs e)
