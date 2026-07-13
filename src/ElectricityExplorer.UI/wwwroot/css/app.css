@@ -1095,14 +1095,14 @@ input:focus {
 
 .bill-table-scroll table {
     width: 100%;
-    min-width: 760px;
+    min-width: 700px;
     border-collapse: collapse;
     font-size: 0.72rem;
 }
 
 .bill-table-scroll th,
 .bill-table-scroll td {
-    padding: 0.62rem 0.7rem;
+    padding: 0.62rem 0.55rem;
     border-bottom: 1px solid var(--line);
     white-space: nowrap;
     text-align: left;
