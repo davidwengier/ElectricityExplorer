@@ -66,9 +66,6 @@ jobs:
           Requires the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Runtime.
           '@
 
-          git tag --force $tag $env:GITHUB_SHA
-          git push origin "refs/tags/$tag" --force
-
           if (gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null) {
               gh release edit $tag `
                   --repo $env:GITHUB_REPOSITORY `
@@ -77,10 +74,14 @@ jobs:
               gh release upload $tag $asset `
                   --repo $env:GITHUB_REPOSITORY `
                   --clobber
+
+              git tag --force $tag $env:GITHUB_SHA
+              git push origin "refs/tags/$tag" --force
           }
           else {
               gh release create $tag $asset `
                   --repo $env:GITHUB_REPOSITORY `
+                  --target $env:GITHUB_SHA `
                   --title "Electricity Explorer - Latest" `
                   --notes $notes
           }
