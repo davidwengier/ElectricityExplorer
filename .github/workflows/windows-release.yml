@@ -78,7 +78,11 @@ jobs:
           VPK_OUTPUT_DIR: .\artifacts\releases
           VPK_REPO_URL: https://github.com/${{ github.repository }}
           VPK_TOKEN: ${{ github.token }}
-        run: dotnet vpk download github
+        run: |
+          dotnet vpk download github `
+              --repoUrl "$env:VPK_REPO_URL" `
+              --token "$env:VPK_TOKEN" `
+              --outputDir "$env:VPK_OUTPUT_DIR"
 
       - name: Pack installer and update assets
         run: |
@@ -123,6 +127,9 @@ jobs:
           VPK_TOKEN: ${{ github.token }}
         run: |
           dotnet vpk upload github `
+              --repoUrl "$env:VPK_REPO_URL" `
+              --token "$env:VPK_TOKEN" `
+              --outputDir "$env:VPK_OUTPUT_DIR" `
               --publish `
               --tag "v${{ steps.release-version.outputs.version }}" `
               --releaseName "Electricity Explorer ${{ steps.release-version.outputs.version }}" `
