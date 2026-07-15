@@ -33,6 +33,9 @@ public partial class Home
     private string? _pendingDeleteId;
     private string? _error;
     private string? _notice;
+    private ApplicationUpdate? _availableUpdate;
+    private string? _updateStatus;
+    private string? _updateFailure;
     private string _busyMessage = "Working locally...";
     private DatasetStorageStatus _storageStatus = new(
         "Local storage",
@@ -40,6 +43,9 @@ public partial class Home
         "NEM12 data and calculations remain on this device.");
     private bool _initializing = true;
     private bool _busy;
+    private bool _checkingForUpdates;
+    private bool _installingUpdate;
+    private bool _showUpdateFailure;
     private ScenarioTab _activeScenarioTab = ScenarioTab.BatterySurvival;
 
     [Inject]
@@ -47,6 +53,14 @@ public partial class Home
 
     [Inject]
     private INem12FilePicker FilePicker { get; set; } = null!;
+
+    [Inject]
+    private IApplicationUpdateService ApplicationUpdateService { get; set; } = null!;
+
+    private string ApplicationNameAndVersion =>
+        string.IsNullOrWhiteSpace(ApplicationUpdateService.CurrentVersion)
+            ? "Electricity Explorer"
+            : $"Electricity Explorer v{ApplicationUpdateService.CurrentVersion}";
 
     private IReadOnlyList<Nem12Channel> SelectedChannels =>
         _dataset?.Channels
@@ -229,8 +243,142 @@ public partial class Home
         }
     }
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && ApplicationUpdateService.CanUpdate)
+        {
+            await CheckForUpdatesAsync(showFailure: false);
+        }
+    }
+
+    private Task CheckForUpdatesManuallyAsync() =>
+        CheckForUpdatesAsync(showFailure: true);
+
+    private async Task CheckForUpdatesAsync(bool showFailure)
+    {
+        if (!ApplicationUpdateService.CanUpdate
+            || _checkingForUpdates
+            || _installingUpdate
+            || _busy)
+        {
+            return;
+        }
+
+        _checkingForUpdates = true;
+        _updateFailure = null;
+        _showUpdateFailure = false;
+        _updateStatus = "Checking for updates...";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            _availableUpdate = await ApplicationUpdateService.CheckForUpdateAsync();
+            _updateStatus = _availableUpdate is null
+                ? "Up to date"
+                : $"Version {_availableUpdate.Version} available";
+        }
+        catch (ApplicationUpdateException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        catch (HttpRequestException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        catch (IOException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        catch (System.Text.Json.JsonException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        catch (OperationCanceledException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure);
+        }
+        finally
+        {
+            _checkingForUpdates = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task InstallUpdateAsync()
+    {
+        if (_availableUpdate is null || _installingUpdate || _busy)
+        {
+            return;
+        }
+
+        _installingUpdate = true;
+        _busy = true;
+        _updateFailure = null;
+        _showUpdateFailure = false;
+        _busyMessage = "Downloading application update...";
+        _updateStatus = $"Downloading version {_availableUpdate.Version}...";
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await ApplicationUpdateService.DownloadUpdateAsync();
+            _updateStatus = "Restarting to install the update...";
+            await InvokeAsync(StateHasChanged);
+            ApplicationUpdateService.ApplyUpdateAndRestart();
+        }
+        catch (ApplicationUpdateException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        catch (HttpRequestException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        catch (IOException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        catch (System.Text.Json.JsonException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        catch (OperationCanceledException exception)
+        {
+            SetUpdateFailure(exception.Message, showFailure: true);
+        }
+        finally
+        {
+            _installingUpdate = false;
+            _busy = false;
+            _busyMessage = "Working locally...";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void SetUpdateFailure(string message, bool showFailure)
+    {
+        _updateFailure = message;
+        _showUpdateFailure = showFailure;
+        _updateStatus = "Update check unavailable";
+    }
+
+    private void DismissUpdateFailure() => _showUpdateFailure = false;
+
     private async Task ImportPickedFileAsync()
     {
+        if (_busy || _installingUpdate)
+        {
+            return;
+        }
+
         await using var file = await FilePicker.PickAsync();
         if (file is null)
         {
@@ -242,6 +390,11 @@ public partial class Home
 
     private async Task ImportFileAsync(string fileName, long fileSize, Stream stream)
     {
+        if (_busy || _installingUpdate)
+        {
+            return;
+        }
+
         _busy = true;
         _error = null;
         _notice = null;
@@ -288,6 +441,11 @@ public partial class Home
 
     private async Task DatasetChangedAsync(ChangeEventArgs args)
     {
+        if (_busy || _installingUpdate)
+        {
+            return;
+        }
+
         var id = args.Value?.ToString();
         if (string.IsNullOrWhiteSpace(id))
         {
@@ -316,6 +474,11 @@ public partial class Home
 
     private async Task NmiChangedAsync(ChangeEventArgs args)
     {
+        if (_busy || _installingUpdate)
+        {
+            return;
+        }
+
         var nmi = args.Value?.ToString();
         if (string.IsNullOrWhiteSpace(nmi))
         {
@@ -340,6 +503,11 @@ public partial class Home
 
     private async Task RunAnalysisAsync()
     {
+        if (_busy || _installingUpdate)
+        {
+            return;
+        }
+
         _busy = true;
         _error = null;
         _notice = null;
@@ -500,7 +668,7 @@ public partial class Home
 
     private async Task DeleteSelectedDatasetAsync()
     {
-        if (_dataset is null)
+        if (_dataset is null || _busy || _installingUpdate)
         {
             return;
         }

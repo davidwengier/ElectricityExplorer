@@ -365,12 +365,25 @@ input:focus {
     color: #185d51;
 }
 
+.alert-update {
+    border: 1px solid #d8c18f;
+    background: var(--amber-pale);
+    color: #65420f;
+}
+
 .alert button {
     border: 0;
     background: transparent;
     color: inherit;
     font-size: 0.78rem;
     font-weight: 800;
+}
+
+.alert-update .button {
+    min-height: 38px;
+    padding: 0.55rem 0.85rem;
+    background: var(--green);
+    color: white;
 }
 
 .getting-started {
@@ -1572,6 +1585,30 @@ input:focus {
 
 .site-footer strong {
     color: var(--ink);
+}
+
+.site-footer-product {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.footer-update-action {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--green);
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.footer-update-action:hover {
+    color: var(--green-deep);
+}
+
+.footer-update-status {
+    color: var(--ink-faint);
 }
 
 .visually-hidden {

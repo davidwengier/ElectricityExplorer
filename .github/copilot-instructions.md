@@ -6,7 +6,7 @@ Electricity Explorer is a Windows-only, local-only Blazor Hybrid desktop applica
 
 - Do not introduce a server, browser-hosted WASM application, cloud storage, authentication, syncing, or telemetry unless explicitly requested.
 - Preserve user data locally. The default database is `%LocalAppData%\ElectricityExplorer\electricity-explorer.db`; window state is `%LocalAppData%\ElectricityExplorer\window-state.json`.
-- The released executable is framework-dependent and requires the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Evergreen Runtime.
+- The packaged application is framework-dependent. Its VeloPack installer checks for the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Evergreen Runtime and offers to install missing prerequisites.
 
 ## Toolchain and commands
 
@@ -35,7 +35,7 @@ Publish the same single-file Windows executable produced by CI with:
 dotnet publish .\src\ElectricityExplorer.Desktop\ElectricityExplorer.Desktop.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -p:DebugType=None -p:DebugSymbols=false -p:PublishDir=.\artifacts\publish\
 ```
 
-`.github\workflows\windows-release.yml` runs tests, publishes, verifies that only `ElectricityExplorer.exe` remains, and updates the mutable `latest` tag and GitHub Release after every successful push to `main`.
+Restore the pinned VeloPack CLI with `dotnet tool restore`, then package that publish output with `dotnet vpk pack`. `.github\workflows\windows-release.yml` runs tests, publishes, creates a VeloPack installer/update feed, and publishes an immutable versioned GitHub Release after every successful push to `main`.
 
 ## Project boundaries
 
@@ -44,7 +44,7 @@ The dependency direction is Core <- UI/Storage <- Desktop:
 - `ElectricityExplorer.Core` contains domain models, NEM12 parsing, storage abstractions, and all calculations. It must remain independent of WinForms, Razor, JavaScript, and SQLite.
 - `ElectricityExplorer.Storage.Sqlite` implements Core's `IDatasetStore`. It owns schema creation and serialized SQLite access.
 - `ElectricityExplorer.UI` contains reusable Razor components, mutable UI settings, SVG charts, and the small JavaScript bridge used for chart navigation.
-- `ElectricityExplorer.Desktop` is the composition root and WinForms host. It supplies the native file picker, SQLite store, window persistence, and embedded WebView content.
+- `ElectricityExplorer.Desktop` is the composition root and WinForms host. It supplies the native file picker, SQLite store, window persistence, VeloPack updater, and embedded WebView content.
 - Tests mirror the pure Core and SQLite projects. There is no server project.
 
 The main data flow is:
@@ -91,4 +91,5 @@ When changing parser or analysis behavior, add focused xUnit coverage for bounda
 - Tests must use temporary database files and clean them up. Never point tests at the user's LocalAppData database. `ELECTRICITY_EXPLORER_DATABASE` is available as a diagnostic/test override.
 - `EmbeddedBlazorWebView` serves manifest resources so the published application can be one executable.
 - `ElectricityExplorer.Desktop.csproj` explicitly embeds `index.html`, `app.css`, `chartNavigator.js`, and the generated Blazor WebView assets. When adding any runtime UI asset, also add it to this embedded-resource list; otherwise it can work from source but be missing from the released EXE.
-- The `RemoveSingleFilePublishExtras` target intentionally deletes every publish output except `ElectricityExplorer.exe`. Do not solve packaging problems by leaving companion DLL or content files unless the release contract is intentionally changed.
+- The VeloPack package ID is `DavidWengier.ElectricityExplorer`, intentionally distinct from the `%LocalAppData%\ElectricityExplorer` data directory so install, update, and uninstall operations cannot remove user data.
+- The `RemoveSingleFilePublishExtras` target intentionally leaves one `ElectricityExplorer.exe` as the VeloPack package input. Runtime release assets belong in the VeloPack output directory rather than beside the published application executable.

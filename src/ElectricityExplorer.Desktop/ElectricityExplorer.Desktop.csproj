@@ -12,6 +12,7 @@
                       GeneratePathProperty="true" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView.WindowsForms" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.FileProviders.Embedded" Version="10.0.0" />
+    <PackageReference Include="Velopack" Version="1.2.0" />
   </ItemGroup>
 
   <PropertyGroup>
@@ -20,6 +21,7 @@
     <AssemblyTitle>Electricity Explorer</AssemblyTitle>
     <Product>Electricity Explorer</Product>
     <Description>Explore NEM12 electricity usage and model battery and solar scenarios.</Description>
+    <Version>0.1.0</Version>
     <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWindowsForms>true</UseWindowsForms>

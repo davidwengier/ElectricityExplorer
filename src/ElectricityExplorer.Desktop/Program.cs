@@ -2,6 +2,7 @@ using ElectricityExplorer.Core.Storage;
 using ElectricityExplorer.Storage.Sqlite;
 using ElectricityExplorer.UI.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Velopack;
 
 namespace ElectricityExplorer.Desktop;
 
@@ -10,6 +11,8 @@ internal static class Program
     [STAThread]
     private static void Main()
     {
+        VelopackApp.Build().Run();
+
         ApplicationConfiguration.Initialize();
 
         var appDataDirectory = Path.Combine(
@@ -26,6 +29,7 @@ internal static class Program
         services.AddWindowsFormsBlazorWebView();
         services.AddSingleton<IDatasetStore>(new SqliteDatasetStore(databasePath));
         services.AddSingleton<INem12FilePicker, WindowsNem12FilePicker>();
+        services.AddSingleton<IApplicationUpdateService, VelopackApplicationUpdateService>();
 
         using var serviceProvider = services.BuildServiceProvider();
         Application.Run(new MainForm(

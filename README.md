@@ -39,17 +39,19 @@ The SQLite database is stored at
 
 ## Install the Windows release
 
-1. Download `ElectricityExplorer.exe` from the
-   [`latest` GitHub Release](https://github.com/davidwengier/ElectricityExplorer/releases/tag/latest).
-2. Install the
-   [.NET 10 Desktop Runtime](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)
-   for Windows x64 if the app prompts for it.
-3. Install the
-   [Microsoft Edge WebView2 Evergreen Runtime](https://go.microsoft.com/fwlink/p/?LinkId=2124703).
-4. Run `ElectricityExplorer.exe`.
+1. Open the
+   [latest GitHub Release](https://github.com/davidwengier/ElectricityExplorer/releases/latest).
+2. Download and run `DavidWengier.ElectricityExplorer-win-Setup.exe`.
+3. Launch Electricity Explorer from the Start menu or desktop shortcut.
 
-Windows 11 and most updated Windows 10 installations already include WebView2,
-but Windows Sandbox may require it to be installed explicitly.
+The installer checks for the .NET 10 Desktop Runtime and Microsoft Edge WebView2
+Evergreen Runtime and offers to install either prerequisite when it is missing.
+Installed copies check GitHub Releases for updates at startup and show an in-app
+prompt before downloading and restarting. Local datasets and window settings
+remain in `%LocalAppData%\ElectricityExplorer` across updates.
+
+Release installers are not currently code-signed, so Windows SmartScreen may
+show an unrecognized publisher warning.
 
 ## Test and build
 
@@ -61,19 +63,27 @@ dotnet build ElectricityExplorer.slnx
 ## Publish the desktop app
 
 ```powershell
+dotnet tool restore
 dotnet publish src\ElectricityExplorer.Desktop -c Release -r win-x64 --self-contained false `
-  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+  -o artifacts\publish -p:Version=0.1.0 -p:PublishSingleFile=true `
+  -p:IncludeNativeLibrariesForSelfExtract=true
+dotnet vpk pack --packId DavidWengier.ElectricityExplorer --packVersion 0.1.0 `
+  --packDir artifacts\publish --mainExe ElectricityExplorer.exe `
+  --packTitle "Electricity Explorer" --packAuthors "David Wengier" `
+  --outputDir artifacts\releases --runtime win-x64 `
+  --icon src\ElectricityExplorer.Desktop\Assets\ElectricityExplorer.ico `
+  --framework "net10.0-x64-desktop,webview2" --noPortable
 ```
 
-The output is written beneath
-`src\ElectricityExplorer.Desktop\bin\Release\net10.0-windows10.0.17763.0\win-x64\publish`.
-It contains a single `ElectricityExplorer.exe` and requires the .NET 10 Desktop
-Runtime and Microsoft Edge WebView2 Runtime described above.
+The publish directory contains the single framework-dependent application
+executable. VeloPack wraps it in a Windows installer and creates the update
+package and release feed beneath `artifacts\releases`.
 
 Every push to `main` also runs the `Publish Windows release` GitHub Actions
-workflow. After its tests pass, the workflow updates the
-[`latest` GitHub Release](https://github.com/davidwengier/ElectricityExplorer/releases/tag/latest)
-with the single-file Windows executable.
+workflow. After its tests pass, the workflow creates an immutable versioned
+GitHub Release containing the installer and VeloPack update assets. GitHub's
+[`latest` release](https://github.com/davidwengier/ElectricityExplorer/releases/latest)
+therefore always points to the newest successful build.
 
 ## Project structure
 

@@ -3,6 +3,31 @@
 <PageTitle>Electricity Explorer</PageTitle>
 
 <main class="page-shell">
+    @if (_availableUpdate is not null)
+    {
+        <div class="alert alert-update" role="status">
+            <strong>Electricity Explorer @_availableUpdate.Version is available</strong>
+            <span>The update keeps your local datasets and restarts the app after downloading.</span>
+            <button type="button"
+                    class="button primary"
+                    @onclick="InstallUpdateAsync"
+                    disabled="@(_installingUpdate || _busy)">
+                @(_installingUpdate ? "Downloading update..." : "Download and restart")
+            </button>
+        </div>
+    }
+
+    @if (_showUpdateFailure && !string.IsNullOrWhiteSpace(_updateFailure))
+    {
+        <div class="alert alert-error" role="alert">
+            <strong>The update could not be completed</strong>
+            <span>@_updateFailure</span>
+            <button type="button"
+                    aria-label="Dismiss update error"
+                    @onclick="DismissUpdateFailure">Dismiss</button>
+        </div>
+    }
+
     <section class="panel import-panel">
         <div class="section-heading">
             <div>
@@ -569,6 +594,21 @@
 </main>
 
 <footer class="site-footer">
-    <strong>Electricity Explorer</strong>
+    <div class="site-footer-product">
+        <strong>@ApplicationNameAndVersion</strong>
+        @if (ApplicationUpdateService.CanUpdate)
+        {
+            <button type="button"
+                    class="footer-update-action"
+                    @onclick="CheckForUpdatesManuallyAsync"
+                    disabled="@(_checkingForUpdates || _installingUpdate || _busy)">
+                @(_checkingForUpdates ? "Checking..." : "Check for updates")
+            </button>
+            @if (!string.IsNullOrWhiteSpace(_updateStatus))
+            {
+                <span class="footer-update-status" title="@_updateFailure">@_updateStatus</span>
+            }
+        }
+    </div>
     <span>@_storageStatus.FooterText</span>
 </footer>

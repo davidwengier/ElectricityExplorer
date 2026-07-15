@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build single-file Windows app
+    name: Build VeloPack Windows installer
     runs-on: windows-latest
     timeout-minutes: 30
 
@@ -28,11 +28,19 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
       - name: Restore
         run: dotnet restore .\ElectricityExplorer.slnx
 
       - name: Test
         run: dotnet test .\ElectricityExplorer.slnx --configuration Release --no-restore
+
+      - name: Set release version
+        id: release-version
+        run: |
+          "version=0.${{ github.run_number }}.${{ github.run_attempt }}" >> $env:GITHUB_OUTPUT
 
       - name: Publish single-file Windows app
         run: >
@@ -42,6 +50,7 @@ jobs:
           --runtime win-x64
           --self-contained false
           --output .\artifacts\publish
+          -p:Version=${{ steps.release-version.outputs.version }}
           -p:PublishSingleFile=true
           -p:IncludeNativeLibrariesForSelfExtract=true
           -p:DebugSymbols=false
@@ -54,37 +63,67 @@ jobs:
               throw "Expected one ElectricityExplorer.exe, found $($files.Count) files."
           }
 
-      - name: Publish GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Create release notes
         run: |
-          $tag = "latest"
-          $asset = Resolve-Path .\artifacts\publish\ElectricityExplorer.exe
-          $notes = @'
+          @'
           Automated build of the latest successful commit on `main`.
 
-          Requires the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Runtime.
-          '@
+          The installer checks for the .NET 10 Desktop Runtime and Microsoft Edge
+          WebView2 Evergreen Runtime and offers to install either prerequisite when
+          it is missing.
+          '@ | Set-Content .\artifacts\release-notes.md -Encoding utf8NoBOM
 
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          $releaseExists = $LASTEXITCODE -eq 0
+      - name: Download previous VeloPack release
+        env:
+          VPK_OUTPUT_DIR: .\artifacts\releases
+          VPK_REPO_URL: https://github.com/${{ github.repository }}
+          VPK_TOKEN: ${{ github.token }}
+        run: dotnet vpk download github
 
-          if ($releaseExists) {
-              gh release edit $tag `
-                  --repo $env:GITHUB_REPOSITORY `
-                  --title "Electricity Explorer - Latest" `
-                  --notes $notes
-              gh release upload $tag $asset `
-                  --repo $env:GITHUB_REPOSITORY `
-                  --clobber
+      - name: Pack installer and update assets
+        run: |
+          dotnet vpk pack `
+              --packId DavidWengier.ElectricityExplorer `
+              --packVersion "${{ steps.release-version.outputs.version }}" `
+              --packDir .\artifacts\publish `
+              --mainExe ElectricityExplorer.exe `
+              --packTitle "Electricity Explorer" `
+              --packAuthors "David Wengier" `
+              --releaseNotes .\artifacts\release-notes.md `
+              --outputDir .\artifacts\releases `
+              --runtime win-x64 `
+              --icon .\src\ElectricityExplorer.Desktop\Assets\ElectricityExplorer.ico `
+              --framework "net10.0-x64-desktop,webview2" `
+              --noPortable
 
-              git tag --force $tag $env:GITHUB_SHA
-              git push origin "refs/tags/$tag" --force
+      - name: Verify VeloPack assets
+        run: |
+          $version = "${{ steps.release-version.outputs.version }}"
+          $requiredFiles = @(
+              ".\artifacts\releases\DavidWengier.ElectricityExplorer-$version-full.nupkg",
+              ".\artifacts\releases\assets.win.json",
+              ".\artifacts\releases\releases.win.json"
+          )
+
+          foreach ($file in $requiredFiles) {
+              if (-not (Test-Path $file -PathType Leaf)) {
+                  throw "Expected VeloPack asset '$file' was not created."
+              }
           }
-          else {
-              gh release create $tag $asset `
-                  --repo $env:GITHUB_REPOSITORY `
-                  --target $env:GITHUB_SHA `
-                  --title "Electricity Explorer - Latest" `
-                  --notes $notes
+
+          $installer = ".\artifacts\releases\DavidWengier.ElectricityExplorer-win-Setup.exe"
+          if (-not (Test-Path $installer -PathType Leaf)) {
+              throw "Expected VeloPack installer '$installer' was not created."
           }
+
+      - name: Publish versioned GitHub release
+        env:
+          VPK_OUTPUT_DIR: .\artifacts\releases
+          VPK_REPO_URL: https://github.com/${{ github.repository }}
+          VPK_TOKEN: ${{ github.token }}
+        run: |
+          dotnet vpk upload github `
+              --publish `
+              --tag "v${{ steps.release-version.outputs.version }}" `
+              --releaseName "Electricity Explorer ${{ steps.release-version.outputs.version }}" `
+              --targetCommitish "$env:GITHUB_SHA"
