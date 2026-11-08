@@ -31,6 +31,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="ElectricityExplorer.Desktop.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <EmbeddedResource Include="Assets\ElectricityExplorer.ico">
       <LogicalName>ElectricityExplorer.Desktop.Assets.ElectricityExplorer.ico</LogicalName>
     </EmbeddedResource>

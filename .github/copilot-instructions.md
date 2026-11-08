@@ -5,7 +5,7 @@
 Electricity Explorer is a Windows-only, local-only Blazor Hybrid desktop application. It imports NEM12 CSV files, stores them in SQLite, and models the recorded site data with hypothetical battery, solar, and tariff changes.
 
 - Do not introduce a server, browser-hosted WASM application, cloud storage, authentication, syncing, or telemetry unless explicitly requested.
-- Preserve user data locally. The default database is `%LocalAppData%\ElectricityExplorer\electricity-explorer.db`; window state is `%LocalAppData%\ElectricityExplorer\window-state.json`.
+- Preserve user data locally. The default database is `%LocalAppData%\ElectricityExplorer\electricity-explorer.db`; window state is `%LocalAppData%\ElectricityExplorer\window-state.json`; electricity offers are `%LocalAppData%\ElectricityExplorer\bill-offers.json`; scenario inputs and view selections are `%LocalAppData%\ElectricityExplorer\settings.json`.
 - The packaged application is framework-dependent. Its VeloPack installer checks for the .NET 10 Desktop Runtime and Microsoft Edge WebView2 Evergreen Runtime and offers to install missing prerequisites.
 
 ## Toolchain and commands
@@ -19,7 +19,7 @@ dotnet run --project .\src\ElectricityExplorer.Desktop
 # Build the complete solution
 dotnet build .\ElectricityExplorer.slnx
 
-# Run all Core and SQLite tests
+# Run all Core, SQLite and desktop settings tests
 dotnet test .\ElectricityExplorer.slnx
 
 # Run one test class
@@ -45,7 +45,7 @@ The dependency direction is Core <- UI/Storage <- Desktop:
 - `ElectricityExplorer.Storage.Sqlite` implements Core's `IDatasetStore`. It owns schema creation and serialized SQLite access.
 - `ElectricityExplorer.UI` contains reusable Razor components, mutable UI settings, SVG charts, and the small JavaScript bridge used for chart navigation.
 - `ElectricityExplorer.Desktop` is the composition root and WinForms host. It supplies the native file picker, SQLite store, window persistence, VeloPack updater, and embedded WebView content.
-- Tests mirror the pure Core and SQLite projects. There is no server project.
+- Tests mirror the Core, SQLite and desktop projects. Desktop settings tests use temporary files. There is no server project.
 
 The main data flow is:
 
@@ -80,6 +80,8 @@ Do not calculate scenarios directly from raw readings or inside Razor markup. Ad
 - The imported history is the baseline and may already include solar or a battery. Model additions against recorded grid import/export rather than trying to reconstruct household load that is not present in NEM12.
 - Battery-survival additions use 80% of nominal added battery capacity. Free-period imports do not drain the modelled battery, and existing solar export plus modelled extra solar may charge it.
 - The bill estimator prices each interval by its start time. Non-overlapping import periods repeat daily and may cross midnight; the default rate applies to gaps and zero rates give free imports. Each period can have a kWh cap and an above-cap rate. Caps reset at the next occurrence of the period, not at midnight or month boundaries, and only excess usage receives the above-cap rate.
+- Bill offers are shared across datasets and saved automatically after edits, including unfinished tariff settings. Persist offer settings only, not estimates, validation errors or component IDs. Dataset changes and opening the estimator must not trigger saves.
+- Battery-survival and detailed-analysis inputs are shared across datasets and saved after edits. Restore the last dataset, NMI, scenario tab and detail day, falling back to available data when a selection no longer exists. Do not write settings during startup. Channel mapping edits save immediately to SQLite rather than the shared settings file.
 - Daily supply charges apply once per represented calendar date. Feed-in credits use all recorded exports. Discounts and demand charges are deliberately not modelled.
 
 When changing parser or analysis behavior, add focused xUnit coverage for boundary conditions such as midnight-spanning windows, duplicate records, unit conversion, partial months/days, missing records, and channel direction.

@@ -108,6 +108,14 @@
         </div>
     }
 
+    @if (!string.IsNullOrWhiteSpace(_settingsStorageError))
+    {
+        <div class="alert alert-error" role="alert">
+            <strong>Settings are not saved</strong>
+            <span>@_settingsStorageError</span>
+        </div>
+    }
+
     @if (!string.IsNullOrWhiteSpace(_notice))
     {
         <div class="alert alert-success" role="status">
@@ -212,7 +220,8 @@
                         <label>
                             <span class="visually-hidden">Direction for channel @channel.NmiSuffix</span>
                             <select value="@channel.Direction"
-                                    @onchange="args => SetChannelDirection(channel, args)">
+                                    @onchange="args => SetChannelDirection(channel, args)"
+                                    disabled="@_busy">
                                 <option value="@EnergyFlowDirection.Import">Grid import</option>
                                 <option value="@EnergyFlowDirection.Export">Grid export</option>
                                 <option value="@EnergyFlowDirection.Ignore">Ignore</option>
@@ -411,7 +420,10 @@
         }
         else if (_activeScenarioTab == ScenarioTab.BillEstimator)
         {
-            <BillEstimatorPanel Profile="_profile" Offers="_billOffers" />
+            <BillEstimatorPanel Profile="_profile"
+                                Offers="_billOffers"
+                                OffersChanged="SaveBillOffers"
+                                StorageError="_billOfferStorageError" />
         }
         else
         {
@@ -433,23 +445,23 @@
                         <div class="field-grid">
                             <label>
                                 <span>Capacity <small>kWh</small></span>
-                                <InputNumber @bind-Value="_settings.BatteryCapacityKwh" min="0" max="200" step="0.5" />
+                                <InputNumber @bind-Value="_settings.BatteryCapacityKwh" @bind-Value:after="SaveApplicationSettings" min="0" max="200" step="0.5" />
                             </label>
                             <label>
                                 <span>Charge / discharge <small>kW</small></span>
-                                <InputNumber @bind-Value="_settings.BatteryPowerKw" min="0" max="100" step="0.5" />
+                                <InputNumber @bind-Value="_settings.BatteryPowerKw" @bind-Value:after="SaveApplicationSettings" min="0" max="100" step="0.5" />
                             </label>
                             <label>
                                 <span>Round-trip efficiency <small>%</small></span>
-                                <InputNumber @bind-Value="_settings.RoundTripEfficiencyPercent" min="50" max="100" step="1" />
+                                <InputNumber @bind-Value="_settings.RoundTripEfficiencyPercent" @bind-Value:after="SaveApplicationSettings" min="50" max="100" step="1" />
                             </label>
                             <label>
                                 <span>Reserve <small>%</small></span>
-                                <InputNumber @bind-Value="_settings.ReservePercent" min="0" max="50" step="1" />
+                                <InputNumber @bind-Value="_settings.ReservePercent" @bind-Value:after="SaveApplicationSettings" min="0" max="50" step="1" />
                             </label>
                             <label class="wide-field">
                                 <span>Starting charge <small>%</small></span>
-                                <InputNumber @bind-Value="_settings.InitialChargePercent" min="0" max="100" step="1" />
+                                <InputNumber @bind-Value="_settings.InitialChargePercent" @bind-Value:after="SaveApplicationSettings" min="0" max="100" step="1" />
                                 <ValidationMessage For="@(() => _settings.InitialChargePercent)" />
                             </label>
                         </div>
@@ -460,11 +472,11 @@
                         <div class="field-grid">
                             <label>
                                 <span>Additional array <small>kW</small></span>
-                                <InputNumber @bind-Value="_settings.AdditionalSolarKw" min="0" max="200" step="0.5" />
+                                <InputNumber @bind-Value="_settings.AdditionalSolarKw" @bind-Value:after="SaveApplicationSettings" min="0" max="200" step="0.5" />
                             </label>
                             <label>
                                 <span>Average yield <small>kWh/kW/day</small></span>
-                                <InputNumber @bind-Value="_settings.SolarYieldKwhPerKwDay" min="0" max="20" step="0.1" />
+                                <InputNumber @bind-Value="_settings.SolarYieldKwhPerKwDay" @bind-Value:after="SaveApplicationSettings" min="0" max="20" step="0.1" />
                             </label>
                         </div>
                         <p class="field-note">Extra solar uses a daylight-shaped estimate that totals the average daily yield you enter.</p>
@@ -475,15 +487,15 @@
                         <div class="field-grid">
                             <label>
                                 <span>Import tariff <small>$/kWh</small></span>
-                                <InputNumber @bind-Value="_settings.ImportTariffPerKwh" min="0" max="10" step="0.01" />
+                                <InputNumber @bind-Value="_settings.ImportTariffPerKwh" @bind-Value:after="SaveApplicationSettings" min="0" max="10" step="0.01" />
                             </label>
                             <label>
                                 <span>Feed-in tariff <small>$/kWh</small></span>
-                                <InputNumber @bind-Value="_settings.FeedInTariffPerKwh" min="0" max="10" step="0.01" />
+                                <InputNumber @bind-Value="_settings.FeedInTariffPerKwh" @bind-Value:after="SaveApplicationSettings" min="0" max="10" step="0.01" />
                             </label>
                             <label class="wide-field">
                                 <span>Compare batteries up to <small>kWh</small></span>
-                                <InputNumber @bind-Value="_settings.MaximumComparedBatteryKwh" min="1" max="100" step="1" />
+                                <InputNumber @bind-Value="_settings.MaximumComparedBatteryKwh" @bind-Value:after="SaveApplicationSettings" min="1" max="100" step="1" />
                             </label>
                         </div>
                     </fieldset>
@@ -491,7 +503,7 @@
                     <button type="submit" class="button primary run-button" disabled="@_busy">
                         @(_busy ? "Calculating..." : "Run local analysis")
                     </button>
-                    <p class="local-action-note">This also saves the channel mapping in local storage.</p>
+                    <p class="local-action-note">Inputs and channel mappings are saved automatically on this device.</p>
                 </EditForm>
             </aside>
 

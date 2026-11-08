@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using ElectricityExplorer.Core.Analysis;
 
 namespace ElectricityExplorer.UI.Models;
@@ -19,14 +20,17 @@ public sealed class BatterySurvivalSettings
 
     public double SolarYieldKwhPerKwDay { get; set; } = 4;
 
+    [JsonIgnore]
     public double UsableBatteryCapacityKwh =>
         AdditionalBatteryCapacityKwh
         * BatterySurvivalOptions.BatteryUtilizationPercent
         / 100d;
 
+    [JsonIgnore]
     public TimeOnly FreeTariffStart => TimeOnly.FromTimeSpan(
         TimeSpan.FromHours(FreeTariffStartHour));
 
+    [JsonIgnore]
     public TimeOnly FreeTariffEnd => TimeOnly.FromTimeSpan(
         TimeSpan.FromHours(FreeTariffEndHour));
 

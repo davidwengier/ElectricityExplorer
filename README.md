@@ -17,6 +17,10 @@ no server, account, authentication, backup or sync.
 - Compares retail electricity offers using monthly bill estimates, daily supply
   charges, feed-in credits and configurable import periods with optional usage
   caps and above-cap rates.
+- Saves electricity offers automatically on this device and restores them when
+  the app opens, ready to compare against any dataset.
+- Remembers battery and solar inputs, analysis prices, and the last selected
+  dataset, NMI, scenario tab and detail day. Channel mappings save as you edit them.
 - Provides sliders for additional battery capacity and solar, with successful
   days capped at the free-power target on the chart.
 - Supports mouse-wheel chart zooming, drag-to-pan, and a full-history overview
@@ -37,6 +41,8 @@ dotnet run --project src\ElectricityExplorer.Desktop
 
 The SQLite database is stored at
 `%LocalAppData%\ElectricityExplorer\electricity-explorer.db`.
+Saved electricity offers are kept alongside it in `bill-offers.json`.
+Other inputs and view selections are kept in `settings.json` in the same folder.
 
 ## Install the Windows release
 

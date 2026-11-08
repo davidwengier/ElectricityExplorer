@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
 using ElectricityExplorer.Core.Analysis;
 
 namespace ElectricityExplorer.UI.Models;
 
 public sealed class BillRateSettings
 {
+    [JsonIgnore]
     public Guid Id { get; } = Guid.NewGuid();
 
     public string Name { get; set; } = "Peak";

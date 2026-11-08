@@ -1,9 +1,11 @@
+using System.Text.Json.Serialization;
 using ElectricityExplorer.Core.Analysis;
 
 namespace ElectricityExplorer.UI.Models;
 
 public sealed class BillOfferSettings
 {
+    [JsonIgnore]
     public Guid Id { get; } = Guid.NewGuid();
 
     public string Name { get; set; } = "Offer";
@@ -14,10 +16,14 @@ public sealed class BillOfferSettings
 
     public decimal FeedInTariffCentsPerKwh { get; set; } = 5;
 
+    [JsonObjectCreationHandling(JsonObjectCreationHandling.Populate)]
     public List<BillRateSettings> TimedRates { get; } = [];
 
+    // Estimates belong to the current dataset, not the offer saved for next time.
+    [JsonIgnore]
     public BillEstimateResult? Estimate { get; set; }
 
+    [JsonIgnore]
     public string? Error { get; set; }
 
     public BillEstimateOptions ToOptions() =>

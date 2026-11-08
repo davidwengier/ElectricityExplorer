@@ -1,6 +1,6 @@
-namespace ElectricityExplorer.UI.Pages;
+namespace ElectricityExplorer.UI.Models;
 
-internal enum ScenarioTab
+public enum ScenarioTab
 {
     BatterySurvival,
     BillEstimator,

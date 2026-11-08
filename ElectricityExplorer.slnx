@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ElectricityExplorer.Core.Tests/ElectricityExplorer.Core.Tests.csproj" />
+    <Project Path="tests/ElectricityExplorer.Desktop.Tests/ElectricityExplorer.Desktop.Tests.csproj" />
     <Project Path="tests/ElectricityExplorer.Storage.Sqlite.Tests/ElectricityExplorer.Storage.Sqlite.Tests.csproj" />
   </Folder>
 </Solution>

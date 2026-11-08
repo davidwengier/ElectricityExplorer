@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using ElectricityExplorer.Core.Analysis;
 using ElectricityExplorer.Core.Models;
 using ElectricityExplorer.Core.Nem12;
@@ -15,9 +16,11 @@ public partial class Home
     private const long MaximumUploadBytes = 100 * 1024 * 1024;
 
     private readonly Nem12Parser _parser = new();
-    private readonly AnalysisSettings _settings = new();
-    private readonly BatterySurvivalSettings _survivalSettings = new();
+    private AnalysisSettings _settings = new();
+    private BatterySurvivalSettings _survivalSettings = new();
     private readonly List<BillOfferSettings> _billOffers = [BillOfferSettings.Create(1)];
+    private string? _billOfferStorageError;
+    private string? _settingsStorageError;
     private IReadOnlyList<DatasetSummary> _summaries = [];
     private ElectricityDataset? _dataset;
     private string? _selectedNmi;
@@ -56,6 +59,12 @@ public partial class Home
 
     [Inject]
     private IApplicationUpdateService ApplicationUpdateService { get; set; } = null!;
+
+    [Inject]
+    private IBillOfferStore BillOfferStore { get; set; } = null!;
+
+    [Inject]
+    private IApplicationSettingsStore ApplicationSettingsStore { get; set; } = null!;
 
     private string ApplicationNameAndVersion =>
         string.IsNullOrWhiteSpace(ApplicationUpdateService.CurrentVersion)
@@ -119,6 +128,7 @@ public partial class Home
         set
         {
             _survivalSettings.BatteryFullAt = AlignToProfileInterval(value);
+            SaveApplicationSettings();
             RecalculateBatterySurvival();
         }
     }
@@ -214,6 +224,38 @@ public partial class Home
 
     protected override async Task OnInitializedAsync()
     {
+        ApplicationSettings? savedSettings = null;
+        try
+        {
+            savedSettings = ApplicationSettingsStore.Load();
+            if (savedSettings is not null)
+            {
+                _settings = savedSettings.Analysis;
+                _survivalSettings = savedSettings.BatterySurvival;
+                _activeScenarioTab = savedSettings.ActiveScenarioTab;
+                _detailDate = savedSettings.DetailDate?.ToDateTime(TimeOnly.MinValue);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _settingsStorageError = $"Saved inputs could not be loaded: {exception.Message}";
+        }
+
+        // Offers are shared across datasets and loaded once, rather than when the estimator tab is opened.
+        try
+        {
+            var savedOffers = BillOfferStore.Load();
+            if (savedOffers.Count > 0)
+            {
+                _billOffers.Clear();
+                _billOffers.AddRange(savedOffers);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _billOfferStorageError = $"Saved offers could not be loaded: {exception.Message}";
+        }
+
         try
         {
             await RefreshSummariesAsync();
@@ -230,7 +272,16 @@ public partial class Home
         {
             if (_summaries.Count > 0)
             {
-                await LoadDatasetAsync(_summaries[0].Id);
+                // Removed datasets and NMIs shouldn't stop the app opening the remaining local data.
+                var summary = _summaries.FirstOrDefault(candidate => candidate.Id == savedSettings?.SelectedDatasetId)
+                    ?? _summaries[0];
+                var restoringDataset = summary.Id == savedSettings?.SelectedDatasetId;
+                if (!restoringDataset)
+                {
+                    _detailDate = null;
+                }
+
+                await LoadDatasetAsync(summary.Id, restoringDataset ? savedSettings?.SelectedNmi : null);
             }
         }
         catch (Exception exception)
@@ -240,6 +291,40 @@ public partial class Home
         finally
         {
             _initializing = false;
+        }
+    }
+
+    private void SaveBillOffers()
+    {
+        try
+        {
+            BillOfferStore.Save(_billOffers);
+            _billOfferStorageError = null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        {
+            _billOfferStorageError = $"Offers could not be saved. Your changes are only kept until the app closes: {exception.Message}";
+        }
+    }
+
+    private void SaveApplicationSettings()
+    {
+        try
+        {
+            ApplicationSettingsStore.Save(new ApplicationSettings
+            {
+                Analysis = _settings,
+                BatterySurvival = _survivalSettings,
+                SelectedDatasetId = _dataset?.Id,
+                SelectedNmi = _selectedNmi,
+                DetailDate = _detailDate is { } date ? DateOnly.FromDateTime(date) : null,
+                ActiveScenarioTab = _activeScenarioTab
+            });
+            _settingsStorageError = null;
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or JsonException or ArgumentException)
+        {
+            _settingsStorageError = $"Inputs could not be saved. Your changes are only kept until the app closes: {exception.Message}";
         }
     }
 
@@ -421,6 +506,7 @@ public partial class Home
             await SetBusyMessageAsync("Calculating battery and solar scenarios...");
             await TryCalculateLoadedDatasetAsync();
 
+            SaveApplicationSettings();
             _notice =
                 $"Imported {dataset.Readings.Count:N0} interval readings from {fileName} and saved them locally.";
         }
@@ -460,6 +546,7 @@ public partial class Home
         {
             await SetBusyMessageAsync("Loading saved readings...");
             await LoadDatasetAsync(id);
+            SaveApplicationSettings();
         }
         catch (Exception exception)
         {
@@ -493,6 +580,7 @@ public partial class Home
         {
             await SetBusyMessageAsync("Calculating battery and solar scenarios...");
             await TryCalculateLoadedDatasetAsync();
+            SaveApplicationSettings();
         }
         finally
         {
@@ -516,6 +604,7 @@ public partial class Home
         {
             await SetBusyMessageAsync("Calculating battery and solar scenarios...");
             await CalculateAnalysisAsync(saveDataset: true);
+            SaveApplicationSettings();
             _notice = "Analysis updated and the channel mapping was saved locally.";
         }
         catch (Exception exception)
@@ -564,13 +653,15 @@ public partial class Home
         BuildDetailSeries();
     }
 
-    private async Task LoadDatasetAsync(string id)
+    private async Task LoadDatasetAsync(string id, string? preferredNmi = null)
     {
         var dataset = await DatasetStore.GetAsync(id)
             ?? throw new InvalidOperationException("The selected dataset no longer exists.");
 
         _dataset = dataset;
-        _selectedNmi = dataset.Nmis.FirstOrDefault();
+        _selectedNmi = dataset.Nmis.Contains(preferredNmi, StringComparer.OrdinalIgnoreCase)
+            ? preferredNmi
+            : dataset.Nmis.FirstOrDefault();
         _pendingDeleteId = null;
         await TryCalculateLoadedDatasetAsync();
     }
@@ -596,17 +687,35 @@ public partial class Home
         _summaries = await DatasetStore.GetSummariesAsync();
     }
 
-    private void SetChannelDirection(Nem12Channel channel, ChangeEventArgs args)
+    private async Task SetChannelDirection(Nem12Channel channel, ChangeEventArgs args)
     {
-        if (Enum.TryParse<EnergyFlowDirection>(args.Value?.ToString(), out var direction))
+        if (_dataset is null || _busy || _installingUpdate
+            || !Enum.TryParse<EnergyFlowDirection>(args.Value?.ToString(), out var direction))
         {
-            channel.Direction = direction;
+            return;
+        }
+
+        channel.Direction = direction;
+        _busy = true;
+        try
+        {
+            // A mapping is dataset data, so keep it in SQLite rather than in the shared scenario settings.
+            await DatasetStore.SaveAsync(_dataset);
+        }
+        catch (Exception exception)
+        {
+            _error = $"The channel mapping could not be saved: {exception.Message}";
+        }
+        finally
+        {
+            _busy = false;
         }
     }
 
     private void SelectScenarioTab(ScenarioTab tab)
     {
         _activeScenarioTab = tab;
+        SaveApplicationSettings();
     }
 
     private void AdditionalBatteryChanged(ChangeEventArgs args)
@@ -616,6 +725,7 @@ public partial class Home
             _survivalSettings.AdditionalBatteryCapacityKwh,
             0,
             BatterySurvivalSettings.MaximumAdditionalBatteryKwh);
+        SaveApplicationSettings();
         RecalculateBatterySurvival();
     }
 
@@ -626,6 +736,7 @@ public partial class Home
             _survivalSettings.AdditionalSolarKw,
             0,
             BatterySurvivalSettings.MaximumAdditionalSolarKw);
+        SaveApplicationSettings();
         RecalculateBatterySurvival();
     }
 
@@ -636,6 +747,7 @@ public partial class Home
             _survivalSettings.FreeTariffStartHour,
             0,
             _survivalSettings.FreeTariffEndHour - 0.5);
+        SaveApplicationSettings();
         RecalculateBatterySurvival();
     }
 
@@ -646,6 +758,7 @@ public partial class Home
             _survivalSettings.FreeTariffEndHour,
             _survivalSettings.FreeTariffStartHour + 0.5,
             23.5);
+        SaveApplicationSettings();
         RecalculateBatterySurvival();
     }
 
@@ -694,6 +807,7 @@ public partial class Home
                 await LoadDatasetAsync(_summaries[0].Id);
             }
 
+            SaveApplicationSettings();
             _notice = $"Deleted {deletedName} from local storage.";
         }
         catch (Exception exception)
@@ -718,6 +832,7 @@ public partial class Home
         {
             _detailDate = date.Date;
             BuildDetailSeries();
+            SaveApplicationSettings();
         }
     }
 

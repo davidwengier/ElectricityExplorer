@@ -30,6 +30,8 @@ internal static class Program
         services.AddSingleton<IDatasetStore>(new SqliteDatasetStore(databasePath));
         services.AddSingleton<INem12FilePicker, WindowsNem12FilePicker>();
         services.AddSingleton<IApplicationUpdateService, VelopackApplicationUpdateService>();
+        services.AddSingleton<IBillOfferStore>(new JsonBillOfferStore(Path.Combine(appDataDirectory, "bill-offers.json")));
+        services.AddSingleton<IApplicationSettingsStore>(new JsonApplicationSettingsStore(Path.Combine(appDataDirectory, "settings.json")));
 
         using var serviceProvider = services.BuildServiceProvider();
         Application.Run(new MainForm(

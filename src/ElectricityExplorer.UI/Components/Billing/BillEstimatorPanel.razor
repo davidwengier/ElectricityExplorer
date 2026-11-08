@@ -5,10 +5,15 @@
         <div>
             <p class="section-kicker">Compare electricity offers</p>
             <h2>What would each month have cost?</h2>
-            <p>Apply retail tariffs to the recorded grid import and export in this NEM12 dataset.</p>
+            <p>Apply retail tariffs to the recorded grid import and export in this NEM12 dataset. Offers are saved automatically on this device.</p>
         </div>
         <button type="button" class="button primary" @onclick="AddOffer">Add another offer</button>
     </div>
+
+    @if (!string.IsNullOrWhiteSpace(StorageError))
+    {
+        <div class="bill-error" role="alert">@StorageError</div>
+    }
 
     <div class="bill-offer-list">
         @foreach (var offer in Offers)
@@ -22,6 +27,7 @@
                                    maxlength="80"
                                    @bind="offer.Name"
                                    @bind:event="oninput"
+                                   @bind:after="() => OfferChangedAsync(offer)"
                                    aria-label="Offer name" />
                         </label>
                         @if (Offers.Count > 1)
@@ -40,7 +46,7 @@
                                    max="100000"
                                    step="0.01"
                                    @bind="offer.DailySupplyChargeCents"
-                                   @bind:after="() => Recalculate(offer)" />
+                                   @bind:after="() => OfferChangedAsync(offer)" />
                         </label>
                         <label>
                             <span>Default import rate <small>c/kWh</small></span>
@@ -49,7 +55,7 @@
                                    max="100000"
                                    step="0.01"
                                    @bind="offer.DefaultImportRateCentsPerKwh"
-                                   @bind:after="() => Recalculate(offer)" />
+                                   @bind:after="() => OfferChangedAsync(offer)" />
                         </label>
                         <label>
                             <span>Feed-in tariff <small>c/kWh</small></span>
@@ -58,7 +64,7 @@
                                    max="100000"
                                    step="0.01"
                                    @bind="offer.FeedInTariffCentsPerKwh"
-                                   @bind:after="() => Recalculate(offer)" />
+                                   @bind:after="() => OfferChangedAsync(offer)" />
                         </label>
                     </div>
 
@@ -89,7 +95,8 @@
                                     <input type="text"
                                            maxlength="40"
                                            @bind="rate.Name"
-                                           @bind:event="oninput" />
+                                           @bind:event="oninput"
+                                           @bind:after="() => OfferChangedAsync(offer)" />
                                 </label>
                                 <label>
                                     <span>Rate <small>c/kWh</small></span>
@@ -98,21 +105,21 @@
                                            max="100000"
                                            step="0.01"
                                            @bind="rate.CentsPerKwh"
-                                           @bind:after="() => Recalculate(offer)" />
+                                           @bind:after="() => OfferChangedAsync(offer)" />
                                 </label>
                                 <label>
                                     <span>Starts</span>
                                     <input type="time"
                                            step="@IntervalSeconds"
                                            @bind="rate.Start"
-                                           @bind:after="() => Recalculate(offer)" />
+                                           @bind:after="() => OfferChangedAsync(offer)" />
                                 </label>
                                 <label>
                                     <span>Ends</span>
                                     <input type="time"
                                            step="@IntervalSeconds"
                                            @bind="rate.End"
-                                           @bind:after="() => Recalculate(offer)" />
+                                           @bind:after="() => OfferChangedAsync(offer)" />
                                 </label>
                                 <button type="button"
                                         class="button text-button bill-remove-rate"
@@ -122,7 +129,7 @@
                                     <label class="bill-checkbox">
                                         <input type="checkbox"
                                                @bind="rate.HasUsageCap"
-                                               @bind:after="() => Recalculate(offer)" />
+                                               @bind:after="() => OfferChangedAsync(offer)" />
                                         <span>Limit usage at this rate</span>
                                     </label>
                                     @if (rate.HasUsageCap)
@@ -134,7 +141,7 @@
                                                        min="0"
                                                        step="0.1"
                                                        @bind="rate.MaximumKwh"
-                                                       @bind:after="() => Recalculate(offer)" />
+                                                       @bind:after="() => OfferChangedAsync(offer)" />
                                             </label>
                                             <label>
                                                 <span>Above-cap rate <small>c/kWh</small></span>
@@ -143,7 +150,7 @@
                                                        max="100000"
                                                        step="0.01"
                                                        @bind="rate.AboveLimitCentsPerKwh"
-                                                       @bind:after="() => Recalculate(offer)" />
+                                                       @bind:after="() => OfferChangedAsync(offer)" />
                                             </label>
                                         </div>
                                         <p class="field-note">The cap resets when this period next starts, not at midnight.</p>
@@ -230,6 +237,12 @@
     [Parameter, EditorRequired]
     public List<BillOfferSettings> Offers { get; set; } = [];
 
+    [Parameter]
+    public EventCallback OffersChanged { get; set; }
+
+    [Parameter]
+    public string? StorageError { get; set; }
+
     private int IntervalSeconds =>
         Profile.Count == 0
             ? 300
@@ -252,7 +265,7 @@
         }
     }
 
-    private void AddOffer()
+    private async Task AddOffer()
     {
         var offerNumber = 1;
         while (Offers.Any(offer => string.Equals(
@@ -265,29 +278,37 @@
 
         var offer = BillOfferSettings.Create(offerNumber);
         Offers.Add(offer);
-        Recalculate(offer);
+        await OfferChangedAsync(offer);
     }
 
-    private void RemoveOffer(BillOfferSettings offer)
+    private async Task RemoveOffer(BillOfferSettings offer)
     {
         if (Offers.Count > 1)
         {
             Offers.Remove(offer);
+            await OffersChanged.InvokeAsync();
         }
     }
 
-    private void AddTimedRate(BillOfferSettings offer)
+    private async Task AddTimedRate(BillOfferSettings offer)
     {
         offer.TimedRates.Add(BillRateSettings.Create(offer.TimedRates.Count));
-        Recalculate(offer);
+        await OfferChangedAsync(offer);
     }
 
-    private void RemoveTimedRate(
+    private async Task RemoveTimedRate(
         BillOfferSettings offer,
         BillRateSettings rate)
     {
         offer.TimedRates.Remove(rate);
+        await OfferChangedAsync(offer);
+    }
+
+    private async Task OfferChangedAsync(BillOfferSettings offer)
+    {
         Recalculate(offer);
+        // Save unfinished edits too, but don't save when only the dataset or selected tab changes.
+        await OffersChanged.InvokeAsync();
     }
 
     private void Recalculate(BillOfferSettings offer)
