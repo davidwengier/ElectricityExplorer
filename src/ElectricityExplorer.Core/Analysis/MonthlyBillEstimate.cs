@@ -10,6 +10,8 @@ public sealed record MonthlyBillEstimate(
     decimal SupplyChargeDollars,
     decimal FeedInCreditDollars)
 {
+    public IReadOnlyList<BillRateBreakdown> RateBreakdown { get; init; } = [];
+
     public decimal TotalCostDollars =>
         UsageChargeDollars + SupplyChargeDollars - FeedInCreditDollars;
 }

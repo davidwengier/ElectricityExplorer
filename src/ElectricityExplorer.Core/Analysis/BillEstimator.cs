@@ -38,7 +38,25 @@ public static class BillEstimator
         var importedKwh = 0d;
         var freeImportKwh = 0d;
         var exportedKwh = 0d;
-        var usageChargeDollars = 0m;
+
+        // Keep every configured rate in input order, even when a month has no usage at that rate.
+        var rateBreakdown = new List<BillRateBreakdown>
+        {
+            new("Default rate", options.DefaultImportRateCentsPerKwh, 0, 0)
+        };
+        var rateIndexes = new Dictionary<TimeOfUseRate, int>();
+        foreach (var rate in options.TimeOfUseRates)
+        {
+            rateIndexes[rate] = rateBreakdown.Count;
+            rateBreakdown.Add(new BillRateBreakdown(rate.Name, rate.CentsPerKwh, 0, 0));
+            if (rate.AboveLimitCentsPerKwh is { } aboveLimitRate)
+            {
+                rateBreakdown.Add(new BillRateBreakdown(rate.Name, aboveLimitRate, 0, 0, IsAboveLimit: true));
+            }
+        }
+
+        var rateImportKwh = new double[rateBreakdown.Count];
+        var rateChargesDollars = new decimal[rateBreakdown.Count];
 
         // Price earlier readings first, even if the caller hasn't supplied them in time order.
         foreach (var interval in intervals.OrderBy(interval => interval.Timestamp))
@@ -72,7 +90,15 @@ public static class BillEstimator
 
             // Only the portion above the cap uses the secondary rate, not the entire crossing interval.
             var aboveLimitKwh = importKwh - primaryKwh;
-            usageChargeDollars += (primaryKwh * primaryRate + aboveLimitKwh * aboveLimitRate) / 100m;
+            var primaryIndex = rate is null ? 0 : rateIndexes[rate];
+            rateImportKwh[primaryIndex] += (double)primaryKwh;
+            rateChargesDollars[primaryIndex] += primaryKwh * primaryRate / 100m;
+            if (rate?.MaximumKwh is not null)
+            {
+                rateImportKwh[primaryIndex + 1] += (double)aboveLimitKwh;
+                rateChargesDollars[primaryIndex + 1] += aboveLimitKwh * aboveLimitRate / 100m;
+            }
+
             if (primaryRate == 0)
             {
                 freeImportKwh += (double)primaryKwh;
@@ -82,6 +108,15 @@ public static class BillEstimator
             {
                 freeImportKwh += (double)aboveLimitKwh;
             }
+        }
+
+        for (var index = 0; index < rateBreakdown.Count; index++)
+        {
+            rateBreakdown[index] = rateBreakdown[index] with
+            {
+                ImportedKwh = rateImportKwh[index],
+                UsageChargeDollars = rateChargesDollars[index]
+            };
         }
 
         var supplyChargeDollars =
@@ -95,9 +130,12 @@ public static class BillEstimator
             importedKwh,
             freeImportKwh,
             exportedKwh,
-            usageChargeDollars,
+            rateChargesDollars.Sum(),
             supplyChargeDollars,
-            feedInCreditDollars);
+            feedInCreditDollars)
+        {
+            RateBreakdown = rateBreakdown
+        };
     }
 
     private static bool IsWithinPeriod(TimeOnly time, TimeOnly start, TimeOnly end)

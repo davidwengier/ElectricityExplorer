@@ -28,6 +28,8 @@ public sealed class BillEstimatorTests
         Assert.Equal(2, result.Months[1].CoveredDays);
         Assert.Equal(3.10m, result.Months[1].TotalCostDollars);
         Assert.Equal(4.65m, result.TotalCostDollars);
+        Assert.Equal(new BillRateBreakdown("Default rate", 30, 2, 0.60m), Assert.Single(result.Months[0].RateBreakdown));
+        Assert.Equal(new BillRateBreakdown("Default rate", 30, 4, 1.20m), Assert.Single(result.Months[1].RateBreakdown));
     }
 
     [Fact]
@@ -95,6 +97,13 @@ public sealed class BillEstimatorTests
         Assert.Equal(30, month.ImportedKwh, precision: 6);
         Assert.Equal(25, month.FreeImportKwh, precision: 6);
         Assert.Equal(1.50m, month.UsageChargeDollars);
+        Assert.Equal(
+            [
+                new BillRateBreakdown("Default rate", 30, 0, 0),
+                new BillRateBreakdown("Free", 0, 25, 0),
+                new BillRateBreakdown("Free", 30, 5, 1.50m, IsAboveLimit: true)
+            ],
+            month.RateBreakdown);
     }
 
     [Fact]
@@ -116,6 +125,13 @@ public sealed class BillEstimatorTests
 
         Assert.Equal(3m, month.UsageChargeDollars);
         Assert.Equal(0, month.FreeImportKwh);
+        Assert.Equal(
+            [
+                new BillRateBreakdown("Default rate", 30, 0, 0),
+                new BillRateBreakdown("Discounted", 10, 15, 1.50m),
+                new BillRateBreakdown("Discounted", 30, 5, 1.50m, IsAboveLimit: true)
+            ],
+            month.RateBreakdown);
     }
 
     [Fact]
@@ -148,6 +164,10 @@ public sealed class BillEstimatorTests
         Assert.Equal(0.05m, result.Months[1].FeedInCreditDollars);
         Assert.Equal(1, result.Months[0].CoveredDays);
         Assert.Equal(1, result.Months[1].CoveredDays);
+        Assert.Equal(new BillRateBreakdown("Overnight", 0, 15, 0), result.Months[0].RateBreakdown[1]);
+        Assert.Equal(new BillRateBreakdown("Overnight", 30, 3, 0.90m, IsAboveLimit: true), result.Months[0].RateBreakdown[2]);
+        Assert.Equal(new BillRateBreakdown("Overnight", 0, 10, 0), result.Months[1].RateBreakdown[1]);
+        Assert.Equal(new BillRateBreakdown("Overnight", 30, 2, 0.60m, IsAboveLimit: true), result.Months[1].RateBreakdown[2]);
     }
 
     [Fact]
@@ -176,6 +196,50 @@ public sealed class BillEstimatorTests
 
         Assert.Equal(6, month.FreeImportKwh, precision: 6);
         Assert.Equal(4.10m, month.UsageChargeDollars);
+        Assert.Equal(
+            [
+                new BillRateBreakdown("Default rate", 40, 5, 2m),
+                new BillRateBreakdown("Morning", 0, 3, 0),
+                new BillRateBreakdown("Morning", 10, 2, 0.20m, IsAboveLimit: true),
+                new BillRateBreakdown("Midday", 0, 3, 0),
+                new BillRateBreakdown("Midday", 20, 2, 0.40m, IsAboveLimit: true),
+                new BillRateBreakdown("Afternoon", 30, 5, 1.50m)
+            ],
+            month.RateBreakdown);
+        Assert.Equal(month.ImportedKwh, month.RateBreakdown.Sum(rate => rate.ImportedKwh), precision: 6);
+        Assert.Equal(month.UsageChargeDollars, month.RateBreakdown.Sum(rate => rate.UsageChargeDollars));
+    }
+
+    [Fact]
+    public void Calculate_BreakdownKeepsSameNamedPeriodsSeparateAndIncludesUnusedRates()
+    {
+        var date = new DateTime(2025, 1, 1);
+        var profile = new[]
+        {
+            new SiteInterval(date.AddHours(11), 1, 2, 0),
+            new SiteInterval(date.AddHours(12), 1, 3, 0)
+        };
+        var options = new BillEstimateOptions
+        {
+            TimeOfUseRates =
+            [
+                new TimeOfUseRate("Peak", 20, new TimeOnly(11, 0), new TimeOnly(12, 0)),
+                new TimeOfUseRate("Peak", 40, new TimeOnly(12, 0), new TimeOnly(13, 0)),
+                new TimeOfUseRate("Unused", 60, new TimeOnly(13, 0), new TimeOnly(14, 0), 15, 70)
+            ]
+        };
+
+        var month = Assert.Single(BillEstimator.Calculate(profile, options).Months);
+
+        Assert.Equal(
+            [
+                new BillRateBreakdown("Default rate", 30, 0, 0),
+                new BillRateBreakdown("Peak", 20, 2, 0.40m),
+                new BillRateBreakdown("Peak", 40, 3, 1.20m),
+                new BillRateBreakdown("Unused", 60, 0, 0),
+                new BillRateBreakdown("Unused", 70, 0, 0, IsAboveLimit: true)
+            ],
+            month.RateBreakdown);
     }
 
     [Fact]

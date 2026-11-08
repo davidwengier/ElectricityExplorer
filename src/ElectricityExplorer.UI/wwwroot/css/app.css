@@ -1152,6 +1152,20 @@ input:focus {
     font-weight: 850;
 }
 
+.bill-rate-column span,
+.bill-rate-column small {
+    display: block;
+}
+
+.bill-rate-column small {
+    margin-top: 0.2rem;
+    color: var(--ink-faint);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
 .bill-error,
 .bill-empty {
     padding: 1rem;

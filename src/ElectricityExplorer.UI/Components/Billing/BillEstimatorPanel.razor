@@ -193,9 +193,14 @@
                                         <th scope="col" class="number total">Total bill</th>
                                         <th scope="col" class="number">Days</th>
                                         <th scope="col" class="number">Import</th>
-                                        <th scope="col" class="number">Free</th>
                                         <th scope="col" class="number">Supply</th>
-                                        <th scope="col" class="number">Usage</th>
+                                        @foreach (var rate in offer.Estimate.Months[0].RateBreakdown)
+                                        {
+                                            <th scope="col" class="number bill-rate-column">
+                                                <span>@rate.Name@(rate.IsAboveLimit ? " (above cap)" : null)</span>
+                                                <small>@rate.CentsPerKwh.ToString("N2") c/kWh</small>
+                                            </th>
+                                        }
                                         <th scope="col" class="number">Feed-in</th>
                                     </tr>
                                 </thead>
@@ -207,9 +212,14 @@
                                             <td class="number total">@FormatCurrency(month.TotalCostDollars)</td>
                                             <td class="number">@month.CoveredDays</td>
                                             <td class="number">@FormatEnergy(month.ImportedKwh)</td>
-                                            <td class="number">@FormatEnergy(month.FreeImportKwh)</td>
                                             <td class="number">@FormatCurrency(month.SupplyChargeDollars)</td>
-                                            <td class="number">@FormatCurrency(month.UsageChargeDollars)</td>
+                                            @foreach (var rate in month.RateBreakdown)
+                                            {
+                                                <td class="number bill-rate-column">
+                                                    <span>@FormatCurrency(rate.UsageChargeDollars)</span>
+                                                    <small>@FormatEnergy(rate.ImportedKwh)</small>
+                                                </td>
+                                            }
                                             <td class="number credit">-@FormatCurrency(month.FeedInCreditDollars)</td>
                                         </tr>
                                     }

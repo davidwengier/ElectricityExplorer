@@ -16,7 +16,8 @@ no server, account, authentication, backup or sync.
   before the next configurable free-tariff period.
 - Compares retail electricity offers using monthly bill estimates, daily supply
   charges, feed-in credits and configurable import periods with optional usage
-  caps and above-cap rates.
+  caps and above-cap rates. Monthly results show cost and kWh for each rate,
+  with above-cap usage shown separately.
 - Saves electricity offers automatically on this device and restores them when
   the app opens, ready to compare against any dataset.
 - Remembers battery and solar inputs, analysis prices, and the last selected
