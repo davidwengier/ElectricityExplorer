@@ -10,7 +10,7 @@ Electricity Explorer is a Windows-only, local-only Blazor Hybrid desktop applica
 
 ## Toolchain and commands
 
-Run commands from the repository root on Windows. `global.json` pins the .NET SDK to `10.0.301`.
+Run commands from the repository root on Windows using the .NET 10 SDK or later. The repository does not pin an SDK version; CI installs the latest .NET 10 SDK.
 
 ```powershell
 # Run the desktop application
@@ -79,7 +79,7 @@ Do not calculate scenarios directly from raw readings or inside Razor markup. Ad
 - E-prefixed channels default to import and B-prefixed channels default to export, but mappings remain user-editable.
 - The imported history is the baseline and may already include solar or a battery. Model additions against recorded grid import/export rather than trying to reconstruct household load that is not present in NEM12.
 - Battery-survival additions use 80% of nominal added battery capacity. Free-period imports do not drain the modelled battery, and existing solar export plus modelled extra solar may charge it.
-- The bill estimator prices each interval by its start time. One default import rate plus at most two non-overlapping timed overrides gives three rates total; a configured free period overrides paid rates. Windows repeat daily and may cross midnight.
+- The bill estimator prices each interval by its start time. Non-overlapping import periods repeat daily and may cross midnight; the default rate applies to gaps and zero rates give free imports. Each period can have a kWh cap and an above-cap rate. Caps reset at the next occurrence of the period, not at midnight or month boundaries, and only excess usage receives the above-cap rate.
 - Daily supply charges apply once per represented calendar date. Feed-in credits use all recorded exports. Discounts and demand charges are deliberately not modelled.
 
 When changing parser or analysis behavior, add focused xUnit coverage for boundary conditions such as midnight-spanning windows, duplicate records, unit conversion, partial months/days, missing records, and channel direction.

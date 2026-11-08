@@ -948,7 +948,6 @@ input:focus {
 }
 
 .bill-input-grid label,
-.bill-time-pair label,
 .bill-rate-row label {
     display: flex;
     min-width: 0;
@@ -957,7 +956,6 @@ input:focus {
 }
 
 .bill-input-grid label > span,
-.bill-time-pair label > span,
 .bill-rate-row label > span {
     color: var(--ink-soft);
     font-size: 0.69rem;
@@ -972,14 +970,12 @@ input:focus {
 }
 
 .bill-input-grid input,
-.bill-time-pair input,
 .bill-rate-row input {
     min-height: 40px;
     padding: 0.5rem 0.55rem;
     font-size: 0.8rem;
 }
 
-.bill-free-period,
 .bill-rates {
     margin: 1.15rem 0 0;
     padding: 1rem 0 0;
@@ -987,16 +983,16 @@ input:focus {
     border-top: 1px solid var(--line);
 }
 
-.bill-free-period legend,
 .bill-rates legend {
     padding: 0;
     font-size: 0.8rem;
     font-weight: 850;
 }
 
-.bill-checkbox {
+.bill-rate-row .bill-checkbox {
     display: inline-flex;
     align-items: center;
+    flex-direction: row;
     gap: 0.55rem;
     margin-top: 0.7rem;
     color: var(--ink-soft);
@@ -1004,17 +1000,23 @@ input:focus {
     font-weight: 700;
 }
 
-.bill-checkbox input {
+.bill-rate-row .bill-checkbox input {
     width: 1rem;
     height: 1rem;
+    min-height: 0;
+    padding: 0;
     accent-color: var(--green);
 }
 
-.bill-time-pair {
+.bill-cap-inputs {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.7rem;
     margin-top: 0.75rem;
+}
+
+.bill-rate-cap {
+    grid-column: 1 / -1;
 }
 
 .bill-rates-heading {

@@ -15,7 +15,8 @@ no server, account, authentication, backup or sync.
 - Replays each complete historical day to show when a full battery would run out
   before the next configurable free-tariff period.
 - Compares retail electricity offers using monthly bill estimates, daily supply
-  charges, feed-in credits, free periods and up to three import rates.
+  charges, feed-in credits and configurable import periods with optional usage
+  caps and above-cap rates.
 - Provides sliders for additional battery capacity and solar, with successful
   days capped at the free-power target on the chart.
 - Supports mouse-wheel chart zooming, drag-to-pan, and a full-history overview
@@ -28,7 +29,7 @@ no server, account, authentication, backup or sync.
 
 ## Run the desktop app
 
-The repository uses the .NET 10 SDK selected by `global.json`.
+Building the app requires the .NET 10 SDK or later.
 
 ```powershell
 dotnet run --project src\ElectricityExplorer.Desktop
@@ -112,7 +113,10 @@ therefore always points to the newest successful build.
 - Bill estimates price the recorded grid imports and exports without changing
   the existing system. Entered rate windows repeat every day, daily supply
   charges apply to each represented date, and discounts and demand charges are
-  not included.
+  not included. Periods cannot overlap; the default import rate applies to gaps.
+  A rate of zero gives free imports. Optional kWh caps apply separately to each
+  occurrence of a period, including overnight windows, with only the excess
+  charged at the above-cap rate. Caps do not reset at midnight or month boundaries.
 - The suggested battery is the smallest tested capacity that reaches 90% of the
   battery-only savings available at the configured maximum comparison size. It
   is a diminishing-returns guide, not a quote or financial recommendation.

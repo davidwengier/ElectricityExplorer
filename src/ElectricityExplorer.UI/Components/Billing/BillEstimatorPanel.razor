@@ -62,51 +62,21 @@
                         </label>
                     </div>
 
-                    <fieldset class="bill-free-period">
-                        <legend>Free imports</legend>
-                        <label class="bill-checkbox">
-                            <input type="checkbox"
-                                   @bind="offer.HasFreePeriod"
-                                   @bind:after="() => Recalculate(offer)" />
-                            <span>This offer has a free period</span>
-                        </label>
-                        @if (offer.HasFreePeriod)
-                        {
-                            <div class="bill-time-pair">
-                                <label>
-                                    <span>Starts</span>
-                                    <input type="time"
-                                           step="@IntervalSeconds"
-                                           @bind="offer.FreePeriodStart"
-                                           @bind:after="() => Recalculate(offer)" />
-                                </label>
-                                <label>
-                                    <span>Ends</span>
-                                    <input type="time"
-                                           step="@IntervalSeconds"
-                                           @bind="offer.FreePeriodEnd"
-                                           @bind:after="() => Recalculate(offer)" />
-                                </label>
-                            </div>
-                        }
-                    </fieldset>
-
                     <fieldset class="bill-rates">
-                        <legend>Import rates</legend>
+                        <legend>Import periods</legend>
                         <div class="bill-rates-heading">
-                            <span>Default plus up to two timed rates.</span>
+                            <span>Set a rate for each window. Use 0 c/kWh for free imports.</span>
                             <button type="button"
                                     class="button bill-add-rate"
-                                    disabled="@(offer.TimedRates.Count >= MaximumTimedRates)"
                                     @onclick="() => AddTimedRate(offer)">
-                                + Add timed rate
+                                + Add period
                             </button>
                         </div>
 
                         <div class="bill-rate-row bill-default-rate">
                             <div>
                                 <strong>Default rate</strong>
-                                <span>Applies whenever no timed or free period applies.</span>
+                                <span>Applies outside the configured periods.</span>
                             </div>
                             <output>@offer.DefaultImportRateCentsPerKwh.ToString("N2") c/kWh</output>
                         </div>
@@ -148,6 +118,37 @@
                                         class="button text-button bill-remove-rate"
                                         aria-label="@($"Remove {rate.Name}")"
                                         @onclick="() => RemoveTimedRate(offer, rate)">Remove</button>
+                                <div class="bill-rate-cap">
+                                    <label class="bill-checkbox">
+                                        <input type="checkbox"
+                                               @bind="rate.HasUsageCap"
+                                               @bind:after="() => Recalculate(offer)" />
+                                        <span>Limit usage at this rate</span>
+                                    </label>
+                                    @if (rate.HasUsageCap)
+                                    {
+                                        <div class="bill-cap-inputs">
+                                            <label>
+                                                <span>Usage cap <small>kWh per period</small></span>
+                                                <input type="number"
+                                                       min="0"
+                                                       step="0.1"
+                                                       @bind="rate.MaximumKwh"
+                                                       @bind:after="() => Recalculate(offer)" />
+                                            </label>
+                                            <label>
+                                                <span>Above-cap rate <small>c/kWh</small></span>
+                                                <input type="number"
+                                                       min="0"
+                                                       max="100000"
+                                                       step="0.01"
+                                                       @bind="rate.AboveLimitCentsPerKwh"
+                                                       @bind:after="() => Recalculate(offer)" />
+                                            </label>
+                                        </div>
+                                        <p class="field-note">The cap resets when this period next starts, not at midnight.</p>
+                                    }
+                                </div>
                             </div>
                         }
 
@@ -213,7 +214,8 @@
                     <p class="bill-assumptions">
                         Prices are assumed to include GST. Each interval is priced from its start time.
                         Rate windows repeat every day, including weekends. Daily charges apply to each date represented
-                        in the file; discounts and demand charges are not included.
+                        in the file; discounts and demand charges are not included. Each period has its own usage cap,
+                        which resets at the start of its next occurrence, even when a window crosses midnight.
                     </p>
                 </section>
             </article>
@@ -222,8 +224,6 @@
 </section>
 
 @code {
-    private const int MaximumTimedRates = 2;
-
     [Parameter]
     public IReadOnlyList<SiteInterval> Profile { get; set; } = [];
 
@@ -278,11 +278,6 @@
 
     private void AddTimedRate(BillOfferSettings offer)
     {
-        if (offer.TimedRates.Count >= MaximumTimedRates)
-        {
-            return;
-        }
-
         offer.TimedRates.Add(BillRateSettings.Create(offer.TimedRates.Count));
         Recalculate(offer);
     }

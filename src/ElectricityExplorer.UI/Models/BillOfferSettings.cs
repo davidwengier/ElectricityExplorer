@@ -14,12 +14,6 @@ public sealed class BillOfferSettings
 
     public decimal FeedInTariffCentsPerKwh { get; set; } = 5;
 
-    public bool HasFreePeriod { get; set; }
-
-    public TimeOnly FreePeriodStart { get; set; } = new(11, 0);
-
-    public TimeOnly FreePeriodEnd { get; set; } = new(14, 0);
-
     public List<BillRateSettings> TimedRates { get; } = [];
 
     public BillEstimateResult? Estimate { get; set; }
@@ -32,8 +26,6 @@ public sealed class BillOfferSettings
             DailySupplyChargeCents = DailySupplyChargeCents,
             DefaultImportRateCentsPerKwh = DefaultImportRateCentsPerKwh,
             FeedInTariffCentsPerKwh = FeedInTariffCentsPerKwh,
-            FreePeriodStart = HasFreePeriod ? FreePeriodStart : null,
-            FreePeriodEnd = HasFreePeriod ? FreePeriodEnd : null,
             TimeOfUseRates = TimedRates.Select(rate => rate.ToRate()).ToArray()
         };
 

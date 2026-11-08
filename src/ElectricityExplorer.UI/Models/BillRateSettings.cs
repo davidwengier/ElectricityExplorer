@@ -14,21 +14,27 @@ public sealed class BillRateSettings
 
     public TimeOnly End { get; set; } = new(21, 0);
 
+    public bool HasUsageCap { get; set; }
+
+    public double MaximumKwh { get; set; } = 15;
+
+    public decimal AboveLimitCentsPerKwh { get; set; } = 30;
+
     public TimeOfUseRate ToRate() =>
         new(
-            string.IsNullOrWhiteSpace(Name) ? "Timed rate" : Name.Trim(),
+            string.IsNullOrWhiteSpace(Name) ? "Period" : Name.Trim(),
             CentsPerKwh,
             Start,
-            End);
+            End,
+            HasUsageCap ? MaximumKwh : null,
+            HasUsageCap ? AboveLimitCentsPerKwh : null);
 
     public static BillRateSettings Create(int timedRateIndex) =>
-        timedRateIndex == 0
-            ? new BillRateSettings()
-            : new BillRateSettings
-            {
-                Name = "Off-peak",
-                CentsPerKwh = 20,
-                Start = new TimeOnly(22, 0),
-                End = new TimeOnly(7, 0)
-            };
+        new()
+        {
+            Name = $"Period {timedRateIndex + 1}",
+            CentsPerKwh = 0,
+            Start = new TimeOnly(11, 0),
+            End = new TimeOnly(14, 0)
+        };
 }

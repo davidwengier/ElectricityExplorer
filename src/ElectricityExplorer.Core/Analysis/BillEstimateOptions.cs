@@ -8,10 +8,6 @@ public sealed record BillEstimateOptions
 
     public decimal FeedInTariffCentsPerKwh { get; init; } = 5;
 
-    public TimeOnly? FreePeriodStart { get; init; }
-
-    public TimeOnly? FreePeriodEnd { get; init; }
-
     public IReadOnlyList<TimeOfUseRate> TimeOfUseRates { get; init; } = [];
 
     public void Validate()
@@ -20,27 +16,30 @@ public sealed record BillEstimateOptions
         EnsureRate(DefaultImportRateCentsPerKwh, nameof(DefaultImportRateCentsPerKwh));
         EnsureRate(FeedInTariffCentsPerKwh, nameof(FeedInTariffCentsPerKwh));
 
-        if (FreePeriodStart.HasValue != FreePeriodEnd.HasValue)
-        {
-            throw new ArgumentException("The free period must have both a start and an end.");
-        }
-
-        if (FreePeriodStart == FreePeriodEnd && FreePeriodStart.HasValue)
-        {
-            throw new ArgumentException("The free period start and end must be different.");
-        }
-
-        if (TimeOfUseRates.Count > 2)
-        {
-            throw new ArgumentException(
-                "At most two timed rates can be added to the default import rate.",
-                nameof(TimeOfUseRates));
-        }
-
         for (var index = 0; index < TimeOfUseRates.Count; index++)
         {
             var rate = TimeOfUseRates[index];
             EnsureRate(rate.CentsPerKwh, $"{nameof(TimeOfUseRates)}[{index}]");
+
+            if (rate.MaximumKwh.HasValue != rate.AboveLimitCentsPerKwh.HasValue)
+            {
+                throw new ArgumentException(
+                    $"{rate.Name} must have both a usage cap and an above-cap rate.",
+                    nameof(TimeOfUseRates));
+            }
+
+            if (rate.MaximumKwh is { } maximumKwh
+                && (!double.IsFinite(maximumKwh) || maximumKwh < 0 || maximumKwh >= (double)decimal.MaxValue))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(TimeOfUseRates),
+                    $"{rate.Name} must have a finite, non-negative usage cap within the supported range.");
+            }
+
+            if (rate.AboveLimitCentsPerKwh is { } aboveLimitRate)
+            {
+                EnsureRate(aboveLimitRate, $"{nameof(TimeOfUseRates)}[{index}].{nameof(rate.AboveLimitCentsPerKwh)}");
+            }
 
             if (rate.Start == rate.End)
             {
