@@ -52,7 +52,7 @@ public sealed class BillEstimatorPanelTests
         Assert.Equal("30.00 c/kWh", headers[7].Element("small")!.Value);
         var rows = table.Element("tbody")!.Elements("tr").ToArray();
         Assert.Equal(2, rows.Length);
-        var january = rows[0].Elements().ToArray();
+        var january = rows[1].Elements().ToArray();
         Assert.Equal(headers.Length, january.Length);
         Assert.Equal("$3.00", january[1].Value);
         AssertRateCell(january[5], "$0.60", "2.0 kWh");
@@ -61,12 +61,32 @@ public sealed class BillEstimatorPanelTests
         AssertRateCell(january[8], "$0.50", "1.0 kWh");
 
         // An unused above-cap rate still needs a cell, otherwise later columns would shift across months.
-        var february = rows[1].Elements().ToArray();
+        var february = rows[0].Elements().ToArray();
         Assert.Equal(headers.Length, february.Length);
         AssertRateCell(february[5], "$0.00", "0.0 kWh");
         AssertRateCell(february[6], "$0.00", "2.0 kWh");
         AssertRateCell(february[7], "$0.00", "0.0 kWh");
         AssertRateCell(february[8], "$0.00", "0.0 kWh");
+    }
+
+    [Fact]
+    public async Task Render_ShowsNewestMonthFirstAcrossYearBoundary()
+    {
+        var offer = BillOfferSettings.Create(1);
+        var table = await RenderTableAsync(
+            offer,
+            [
+                new SiteInterval(new DateTime(2024, 12, 1, 12, 0, 0), 1, 1, 0),
+                new SiteInterval(new DateTime(2025, 1, 1, 12, 0, 0), 1, 2, 0),
+                new SiteInterval(new DateTime(2025, 2, 1, 12, 0, 0), 1, 3, 0)
+            ]);
+
+        var rows = table.Element("tbody")!.Elements("tr").ToArray();
+        Assert.Equal(["$1.90", "$1.60", "$1.30"], rows.Select(row => row.Elements("td").First().Value));
+        // Display order must not change the chronological calculation results.
+        Assert.Equal(
+            [new DateOnly(2024, 12, 1), new DateOnly(2025, 1, 1), new DateOnly(2025, 2, 1)],
+            offer.Estimate!.Months.Select(month => month.Month));
     }
 
     [Fact]

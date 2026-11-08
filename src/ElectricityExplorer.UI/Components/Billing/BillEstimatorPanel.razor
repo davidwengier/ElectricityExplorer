@@ -205,7 +205,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @foreach (var month in offer.Estimate.Months)
+                                    @foreach (var month in offer.Estimate.Months.OrderByDescending(month => month.Month))
                                     {
                                         <tr>
                                             <th scope="row">@FormatMonth(month.Month)</th>
