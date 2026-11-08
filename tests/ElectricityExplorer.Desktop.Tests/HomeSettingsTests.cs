@@ -109,11 +109,45 @@ public sealed class HomeSettingsTests : IDisposable
         Assert.DoesNotContain("Something needs attention", html);
     }
 
-    private async Task<string> RenderHomeAsync(ApplicationSettings settings)
+    [Fact]
+    public async Task OpeningBillEstimator_WithoutStorageErrorShowsNoErrorBar()
+    {
+        var html = await RenderHomeAsync(new ApplicationSettings
+        {
+            SelectedDatasetId = "selected",
+            ActiveScenarioTab = ScenarioTab.BillEstimator
+        });
+
+        Assert.Contains("What would each month have cost?", html);
+        Assert.DoesNotContain("class=\"bill-error\"", html);
+        Assert.DoesNotContain("_billOfferStorageError", html);
+    }
+
+    [Fact]
+    public async Task OpeningBillEstimator_WithCorruptOffersShowsActualStorageError()
+    {
+        var html = await RenderHomeAsync(new ApplicationSettings
+        {
+            SelectedDatasetId = "selected",
+            ActiveScenarioTab = ScenarioTab.BillEstimator
+        }, savedOffersJson: "[unfinished");
+
+        Assert.Contains("class=\"bill-error\"", html);
+        Assert.Contains("Saved offers could not be loaded:", html);
+        Assert.DoesNotContain("_billOfferStorageError", html);
+    }
+
+    private async Task<string> RenderHomeAsync(ApplicationSettings settings, string? savedOffersJson = null)
     {
         var settingsStore = new JsonApplicationSettingsStore(SettingsPath);
         settingsStore.Save(settings);
         var savedJson = File.ReadAllText(SettingsPath);
+        var offersPath = Path.Combine(_directory, "bill-offers.json");
+        if (savedOffersJson is not null)
+        {
+            File.WriteAllText(offersPath, savedOffersJson);
+        }
+
         using var datasetStore = new SqliteDatasetStore(Path.Combine(_directory, "test.db"));
         await datasetStore.SaveAsync(CreateDataset("selected", new DateTimeOffset(2025, 1, 1, 0, 0, 0, TimeSpan.Zero)));
         await datasetStore.SaveAsync(CreateDataset("newest", new DateTimeOffset(2025, 1, 2, 0, 0, 0, TimeSpan.Zero)));
@@ -136,7 +170,14 @@ public sealed class HomeSettingsTests : IDisposable
 
         // Startup can choose a fallback without overwriting what was saved or creating default offers.
         Assert.Equal(savedJson, File.ReadAllText(SettingsPath));
-        Assert.False(File.Exists(Path.Combine(_directory, "bill-offers.json")));
+        if (savedOffersJson is null)
+        {
+            Assert.False(File.Exists(offersPath));
+        }
+        else
+        {
+            Assert.Equal(savedOffersJson, File.ReadAllText(offersPath));
+        }
         return html;
     }
 
